@@ -1,0 +1,343 @@
+import { useAtom } from 'jotai';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  createMaterial,
+  deactivateMaterial,
+  listMaterials,
+  reactivateMaterial,
+  updateMaterial,
+} from '../../api/materialApi.js';
+import { activeFilterAtom, categoryFilterAtom, editingMaterialAtom } from '../../atoms/materialAtoms.js';
+
+const emptyForm = {
+  name: '',
+  category: 'RAW',
+  baseUnit: 'WEIGHT',
+  mainMaterial: false,
+};
+
+export default function MaterialsTab() {
+  const [categoryFilter, setCategoryFilter] = useAtom(categoryFilterAtom);
+  const [activeFilter, setActiveFilter] = useAtom(activeFilterAtom);
+  const [editingMaterial, setEditingMaterial] = useAtom(editingMaterialAtom);
+
+  // queryClient: 「今キャッシュされているデータを、サーバーへもう一度取りに行かせる(無効化する)」
+  // 指示を出すための道具。登録・編集・廃版/復元が成功した直後に呼ぶことで、
+  // 一覧を自動的に最新の状態へ更新する(これまでのloadMaterials()の手動呼び出しが不要になる)。
+  const queryClient = useQueryClient();
+
+  /**
+   * useQuery: 「サーバーから何かを取ってくる」処理を、
+   * データ・読み込み中フラグ・エラーをまとめて管理してくれるフック。
+   *
+   * queryKey: このデータを何と呼ぶかの「名札」。配列の中身(フィルター条件)が変わると
+   *   TanStack Queryが自動的に「これは別のデータだ」と判断し、再取得してくれる。
+   *   これまで useEffect(() => { loadMaterials() }, [categoryFilter, activeFilter]) と
+   *   手動で書いていた「条件が変わったら取り直す」処理を、queryKeyに条件を含めるだけで
+   *   自動的にやってくれるようになる。
+   * queryFn: 実際にデータを取りに行く関数。
+   */
+  const {
+    data: materials = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['materials', { category: categoryFilter, active: activeFilter }],
+    queryFn: () => listMaterials({ category: categoryFilter, active: activeFilter }),
+  });
+
+  /**
+   * useMutation: 「サーバーのデータを変更する」処理(登録・更新・削除等)をまとめる仕組み。
+   * onSuccess で queryClient.invalidateQueries を呼び、
+   * queryKeyが['materials', ...]で始まる全てのキャッシュ(=どんなフィルター条件で見ていても)を
+   * 「古い」とマークする。これにより画面は自動的に最新データを取り直して再表示する。
+   */
+  const createMutation = useMutation({
+    mutationFn: createMaterial,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+      setEditingMaterial(null);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ materialId, material }) => updateMaterial(materialId, material),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['materials'] });
+      setEditingMaterial(null);
+    },
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: deactivateMaterial,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['materials'] }),
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: reactivateMaterial,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['materials'] }),
+  });
+
+  function handleSubmit(formValues) {
+    if (editingMaterial) {
+      updateMutation.mutate({ materialId: editingMaterial.materialId, material: formValues });
+    } else {
+      createMutation.mutate(formValues);
+    }
+  }
+
+  // 登録/更新どちらかの通信が進行中かどうか。フォームのボタンの無効化等に使える。
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  // 複数のmutationのうち、どれかがエラーを持っていればそれを表示する。
+  // useQueryのerrorと合わせて、画面上部に1つのアラートとしてまとめて出す。
+  const displayError =
+    error?.message ||
+    createMutation.error?.message ||
+    updateMutation.error?.message ||
+    deactivateMutation.error?.message ||
+    reactivateMutation.error?.message;
+
+  return (
+    <div>
+      {/* 見出し・外枠(container)は親のMastersPage側が持つため、ここでは中身だけを描画する */}
+
+      {displayError && (
+        <div className="alert alert-danger" role="alert">
+          {displayError}
+        </div>
+      )}
+
+      <div className="row g-4">
+        <div className="col-12 col-lg-4">
+          <MaterialForm
+            key={editingMaterial ? editingMaterial.materialId : 'new'}
+            initialValue={editingMaterial ?? emptyForm}
+            isEditing={!!editingMaterial}
+            isSaving={isSaving}
+            onSubmit={handleSubmit}
+            onCancelEdit={() => setEditingMaterial(null)}
+          />
+        </div>
+
+        <div className="col-12 col-lg-8">
+          <FilterBar
+            categoryFilter={categoryFilter}
+            activeFilter={activeFilter}
+            onCategoryChange={setCategoryFilter}
+            onActiveChange={setActiveFilter}
+            onReload={() => queryClient.invalidateQueries({ queryKey: ['materials'] })}
+          />
+
+          {isLoading ? (
+            <p className="text-muted">読み込み中...</p>
+          ) : (
+            <MaterialTable
+              materials={materials}
+              onEdit={setEditingMaterial}
+              onDeactivate={(id) => deactivateMutation.mutate(id)}
+              onReactivate={(id) => reactivateMutation.mutate(id)}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterBar({ categoryFilter, activeFilter, onCategoryChange, onActiveChange, onReload }) {
+  return (
+    <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
+      <h2 className="h5 mb-0 me-auto">登録済み材料一覧</h2>
+
+      <select
+        className="form-select form-select-sm w-auto"
+        value={categoryFilter}
+        onChange={(e) => onCategoryChange(e.target.value)}
+      >
+        <option value="">分類: すべて</option>
+        <option value="RAW">原料のみ</option>
+        <option value="ADDITIVE">添加物のみ</option>
+      </select>
+
+      <select
+        className="form-select form-select-sm w-auto"
+        value={activeFilter}
+        onChange={(e) => onActiveChange(e.target.value)}
+      >
+        <option value="">状態: すべて</option>
+        <option value="true">有効なもののみ</option>
+        <option value="false">廃版のもののみ</option>
+      </select>
+
+      <button className="btn btn-outline-secondary btn-sm" onClick={onReload}>
+        再読み込み
+      </button>
+    </div>
+  );
+}
+
+function MaterialTable({ materials, onEdit, onDeactivate, onReactivate }) {
+  return (
+    <table className="table table-striped table-hover align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>材料名</th>
+          <th>分類</th>
+          <th>単位系</th>
+          <th>主原料</th>
+          <th>状態</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {materials.length === 0 ? (
+          <tr>
+            <td colSpan="7" className="text-center text-muted">
+              該当する材料がありません
+            </td>
+          </tr>
+        ) : (
+          materials.map((material) => (
+            <tr key={material.materialId} className={material.active ? '' : 'text-muted'}>
+              <td>{material.materialId}</td>
+              <td>{material.name}</td>
+              <td>{material.category === 'RAW' ? '原料' : '添加物'}</td>
+              <td>{material.baseUnit === 'WEIGHT' ? '重量(g)' : '体積(ml)'}</td>
+              <td>{material.mainMaterial ? '○' : ''}</td>
+              <td>
+                {material.active ? (
+                  <span className="badge text-bg-success">有効</span>
+                ) : (
+                  <span className="badge text-bg-secondary">廃版</span>
+                )}
+              </td>
+              <td>
+                <div className="btn-group btn-group-sm">
+                  <button className="btn btn-outline-primary" onClick={() => onEdit(material)}>
+                    編集
+                  </button>
+                  {material.active ? (
+                    <button
+                      className="btn btn-outline-danger"
+                      onClick={() => onDeactivate(material.materialId)}
+                    >
+                      廃版にする
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-outline-success"
+                      onClick={() => onReactivate(material.materialId)}
+                    >
+                      復元する
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+function MaterialForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit }) {
+  const [form, setForm] = useState(initialValue);
+
+  function handleChange(event) {
+    const { name, value, type, checked } = event.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSubmit(form);
+  }
+
+  return (
+    <div className="card">
+      <div className="card-body">
+        <h2 className="h5 card-title">{isEditing ? '材料を編集' : '新規登録'}</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label htmlFor="name" className="form-label">
+              材料名
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              className="form-control"
+              value={form.name}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div className="mb-3">
+            <label htmlFor="category" className="form-label">
+              分類
+            </label>
+            <select
+              id="category"
+              name="category"
+              className="form-select"
+              value={form.category}
+              onChange={handleChange}
+            >
+              <option value="RAW">原料</option>
+              <option value="ADDITIVE">添加物</option>
+            </select>
+          </div>
+
+          <div className="mb-3">
+            <label htmlFor="baseUnit" className="form-label">
+              単位系
+            </label>
+            <select
+              id="baseUnit"
+              name="baseUnit"
+              className="form-select"
+              value={form.baseUnit}
+              onChange={handleChange}
+            >
+              <option value="WEIGHT">重量(g)</option>
+              <option value="VOLUME">体積(ml)</option>
+            </select>
+          </div>
+
+          <div className="form-check mb-3">
+            <input
+              id="mainMaterial"
+              name="mainMaterial"
+              type="checkbox"
+              className="form-check-input"
+              checked={form.mainMaterial}
+              onChange={handleChange}
+            />
+            <label htmlFor="mainMaterial" className="form-check-label">
+              主原料(ベーカーズパーセント計算の基準にする)
+            </label>
+          </div>
+
+          <div className="d-flex gap-2">
+            <button type="submit" className="btn btn-primary flex-grow-1" disabled={isSaving}>
+              {isSaving ? '送信中...' : isEditing ? '更新する' : '登録する'}
+            </button>
+            {isEditing && (
+              <button type="button" className="btn btn-outline-secondary" onClick={onCancelEdit}>
+                キャンセル
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
