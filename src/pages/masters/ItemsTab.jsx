@@ -1,18 +1,18 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createItem,
   deactivateItem,
   listItems,
   reactivateItem,
   updateItem,
-} from '../../api/itemApi.js';
-import ConfirmModal from '../../components/ConfirmModal.jsx';
+} from "../../api/itemApi.js";
+import ConfirmModal from "../../components/ConfirmModal.jsx";
 
 const emptyForm = {
-  name: '',
-  safetyStockQty: '',
-  standardBatchQty: '',
+  name: "",
+  safetyStockQty: "",
+  standardBatchQty: "",
   shelfLifeDays: 90,
 };
 
@@ -20,18 +20,23 @@ export default function ItemsTab() {
   const [editingItem, setEditingItem] = useState(null);
   const [pendingSubmit, setPendingSubmit] = useState(null);
   const [pendingDeactivateId, setPendingDeactivateId] = useState(null);
+  const [activeFilter, setActiveFilter] = useState(""); // '' = 絞り込まない, 'true', 'false'
 
   const queryClient = useQueryClient();
 
-  const { data: items = [], isLoading, error } = useQuery({
-    queryKey: ['items'],
-    queryFn: () => listItems(),
+  const {
+    data: items = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["items", { active: activeFilter }],
+    queryFn: () => listItems(activeFilter),
   });
 
   const createMutation = useMutation({
     mutationFn: createItem,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
       setEditingItem(null);
     },
   });
@@ -39,19 +44,19 @@ export default function ItemsTab() {
   const updateMutation = useMutation({
     mutationFn: ({ itemId, item }) => updateItem(itemId, item),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ["items"] });
       setEditingItem(null);
     },
   });
 
   const deactivateMutation = useMutation({
     mutationFn: deactivateItem,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['items'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["items"] }),
   });
 
   const reactivateMutation = useMutation({
     mutationFn: reactivateItem,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['items'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["items"] }),
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -63,12 +68,20 @@ export default function ItemsTab() {
     reactivateMutation.error?.message;
 
   function handleRequestSubmit(formValues) {
-    setPendingSubmit(formValues);
+    // targetStockQty(目標在庫)は将来拡張用の項目で、現時点では入力欄を設けていない。
+    // DB側はNOT NULLのため、ここでsafetyStockQty(適正在庫)と同じ値を自動的に補って送信する。
+    setPendingSubmit({
+      ...formValues,
+      targetStockQty: formValues.safetyStockQty,
+    });
   }
 
   function handleConfirmSubmit() {
     if (editingItem) {
-      updateMutation.mutate({ itemId: editingItem.itemId, item: pendingSubmit });
+      updateMutation.mutate({
+        itemId: editingItem.itemId,
+        item: pendingSubmit,
+      });
     } else {
       createMutation.mutate(pendingSubmit);
     }
@@ -88,7 +101,7 @@ export default function ItemsTab() {
       <div className="row g-4">
         <div className="col-12 col-lg-4">
           <ItemForm
-            key={editingItem ? editingItem.itemId : 'new'}
+            key={editingItem ? editingItem.itemId : "new"}
             initialValue={editingItem ?? emptyForm}
             isEditing={!!editingItem}
             isSaving={isSaving}
@@ -98,7 +111,18 @@ export default function ItemsTab() {
         </div>
 
         <div className="col-12 col-lg-8">
-          <h2 className="h5 mb-3">登録済み商品一覧</h2>
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <h2 className="h5 mb-0">登録済み商品一覧</h2>
+            <select
+              className="form-select form-select-sm w-auto"
+              value={activeFilter}
+              onChange={(e) => setActiveFilter(e.target.value)}
+            >
+              <option value="">状態: すべて</option>
+              <option value="true">有効なもののみ</option>
+              <option value="false">廃版のもののみ</option>
+            </select>
+          </div>
           {isLoading ? (
             <p className="text-muted">読み込み中...</p>
           ) : (
@@ -123,7 +147,10 @@ export default function ItemsTab() {
                   </tr>
                 ) : (
                   items.map((item) => (
-                    <tr key={item.itemId} className={item.active ? '' : 'text-muted'}>
+                    <tr
+                      key={item.itemId}
+                      className={item.active ? "" : "text-muted"}
+                    >
                       <td>{item.itemId}</td>
                       <td>{item.name}</td>
                       <td>{item.safetyStockQty}</td>
@@ -138,20 +165,27 @@ export default function ItemsTab() {
                       </td>
                       <td>
                         <div className="btn-group btn-group-sm">
-                          <button className="btn btn-outline-primary" onClick={() => setEditingItem(item)}>
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => setEditingItem(item)}
+                          >
                             編集
                           </button>
                           {item.active ? (
                             <button
                               className="btn btn-outline-danger"
-                              onClick={() => setPendingDeactivateId(item.itemId)}
+                              onClick={() =>
+                                setPendingDeactivateId(item.itemId)
+                              }
                             >
                               廃版にする
                             </button>
                           ) : (
                             <button
                               className="btn btn-outline-success"
-                              onClick={() => reactivateMutation.mutate(item.itemId)}
+                              onClick={() =>
+                                reactivateMutation.mutate(item.itemId)
+                              }
                             >
                               復元する
                             </button>
@@ -169,15 +203,21 @@ export default function ItemsTab() {
 
       <ConfirmModal
         show={pendingSubmit !== null}
-        title={editingItem ? 'この内容で更新します' : 'この内容で登録します'}
-        confirmLabel={editingItem ? '更新する' : '登録する'}
+        title={editingItem ? "この内容で更新します" : "この内容で登録します"}
+        confirmLabel={editingItem ? "更新する" : "登録する"}
         summaryLines={
           pendingSubmit
             ? [
-                { label: '商品名', value: pendingSubmit.name },
-                { label: '適正在庫', value: pendingSubmit.safetyStockQty },
-                { label: '標準バッチ数', value: pendingSubmit.standardBatchQty },
-                { label: '賞味期限', value: `${pendingSubmit.shelfLifeDays}日` },
+                { label: "商品名", value: pendingSubmit.name },
+                { label: "適正在庫", value: pendingSubmit.safetyStockQty },
+                {
+                  label: "標準バッチ数",
+                  value: pendingSubmit.standardBatchQty,
+                },
+                {
+                  label: "賞味期限",
+                  value: `${pendingSubmit.shelfLifeDays}日`,
+                },
               ]
             : []
         }
@@ -189,7 +229,11 @@ export default function ItemsTab() {
         show={pendingDeactivateId !== null}
         title="この商品を廃版にします"
         confirmLabel="廃版にする"
-        summaryLines={deactivateTarget ? [{ label: '商品名', value: deactivateTarget.name }] : []}
+        summaryLines={
+          deactivateTarget
+            ? [{ label: "商品名", value: deactivateTarget.name }]
+            : []
+        }
         onConfirm={() => {
           deactivateMutation.mutate(pendingDeactivateId);
           setPendingDeactivateId(null);
@@ -200,7 +244,13 @@ export default function ItemsTab() {
   );
 }
 
-function ItemForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit }) {
+function ItemForm({
+  initialValue,
+  isEditing,
+  isSaving,
+  onSubmit,
+  onCancelEdit,
+}) {
   const [form, setForm] = useState(initialValue);
 
   function handleChange(event) {
@@ -216,7 +266,9 @@ function ItemForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit })
   return (
     <div className="card">
       <div className="card-body">
-        <h2 className="h5 card-title">{isEditing ? '商品を編集' : '新規登録'}</h2>
+        <h2 className="h5 card-title">
+          {isEditing ? "商品を編集" : "新規登録"}
+        </h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label htmlFor="name" className="form-label">
@@ -279,11 +331,19 @@ function ItemForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit })
           </div>
 
           <div className="d-flex gap-2">
-            <button type="submit" className="btn btn-primary flex-grow-1" disabled={isSaving}>
-              {isSaving ? '送信中...' : isEditing ? '更新する' : '登録する'}
+            <button
+              type="submit"
+              className="btn btn-primary flex-grow-1"
+              disabled={isSaving}
+            >
+              {isSaving ? "送信中..." : isEditing ? "更新する" : "登録する"}
             </button>
             {isEditing && (
-              <button type="button" className="btn btn-outline-secondary" onClick={onCancelEdit}>
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={onCancelEdit}
+              >
                 キャンセル
               </button>
             )}
