@@ -9,6 +9,7 @@ import {
   updateMaterial,
 } from '../../api/materialApi.js';
 import { activeFilterAtom, categoryFilterAtom, editingMaterialAtom } from '../../atoms/materialAtoms.js';
+import ConfirmModal from '../../components/ConfirmModal.jsx';
 
 const emptyForm = {
   name: '',
@@ -17,27 +18,28 @@ const emptyForm = {
   mainMaterial: false,
 };
 
+// フォームの値(RAW/WEIGHT等の内部コード)を、確認モーダルに表示する日本語ラベルに変換する。
+function categoryLabel(category) {
+  return category === 'RAW' ? '原料' : '添加物';
+}
+function baseUnitLabel(baseUnit) {
+  return baseUnit === 'WEIGHT' ? '重量(g)' : '体積(ml)';
+}
+
 export default function MaterialsTab() {
   const [categoryFilter, setCategoryFilter] = useAtom(categoryFilterAtom);
   const [activeFilter, setActiveFilter] = useAtom(activeFilterAtom);
   const [editingMaterial, setEditingMaterial] = useAtom(editingMaterialAtom);
 
-  // queryClient: 「今キャッシュされているデータを、サーバーへもう一度取りに行かせる(無効化する)」
-  // 指示を出すための道具。登録・編集・廃版/復元が成功した直後に呼ぶことで、
-  // 一覧を自動的に最新の状態へ更新する(これまでのloadMaterials()の手動呼び出しが不要になる)。
+  // pendingSubmit: 「登録/編集フォームの送信」で確認待ちになっている入力値。
+  //   nullなら確認モーダルは閉じている状態。
+  // pendingDeactivateId: 「廃版にする」ボタンで確認待ちになっている材料ID。
+  //   これも2つの操作を同時に確認待ちにしないよう、別々のstateに分けている。
+  const [pendingSubmit, setPendingSubmit] = useState(null);
+  const [pendingDeactivateId, setPendingDeactivateId] = useState(null);
+
   const queryClient = useQueryClient();
 
-  /**
-   * useQuery: 「サーバーから何かを取ってくる」処理を、
-   * データ・読み込み中フラグ・エラーをまとめて管理してくれるフック。
-   *
-   * queryKey: このデータを何と呼ぶかの「名札」。配列の中身(フィルター条件)が変わると
-   *   TanStack Queryが自動的に「これは別のデータだ」と判断し、再取得してくれる。
-   *   これまで useEffect(() => { loadMaterials() }, [categoryFilter, activeFilter]) と
-   *   手動で書いていた「条件が変わったら取り直す」処理を、queryKeyに条件を含めるだけで
-   *   自動的にやってくれるようになる。
-   * queryFn: 実際にデータを取りに行く関数。
-   */
   const {
     data: materials = [],
     isLoading,
@@ -47,12 +49,6 @@ export default function MaterialsTab() {
     queryFn: () => listMaterials({ category: categoryFilter, active: activeFilter }),
   });
 
-  /**
-   * useMutation: 「サーバーのデータを変更する」処理(登録・更新・削除等)をまとめる仕組み。
-   * onSuccess で queryClient.invalidateQueries を呼び、
-   * queryKeyが['materials', ...]で始まる全てのキャッシュ(=どんなフィルター条件で見ていても)を
-   * 「古い」とマークする。これにより画面は自動的に最新データを取り直して再表示する。
-   */
   const createMutation = useMutation({
     mutationFn: createMaterial,
     onSuccess: () => {
@@ -74,24 +70,15 @@ export default function MaterialsTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['materials'] }),
   });
 
+  // 復元だけは「取り消しの手間がほぼ無い」操作のため、確認モーダルなしで即実行する
+  // (共通ルール: 復元以外の操作は全て確認モーダルを挟む)。
   const reactivateMutation = useMutation({
     mutationFn: reactivateMaterial,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['materials'] }),
   });
 
-  function handleSubmit(formValues) {
-    if (editingMaterial) {
-      updateMutation.mutate({ materialId: editingMaterial.materialId, material: formValues });
-    } else {
-      createMutation.mutate(formValues);
-    }
-  }
-
-  // 登録/更新どちらかの通信が進行中かどうか。フォームのボタンの無効化等に使える。
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
-  // 複数のmutationのうち、どれかがエラーを持っていればそれを表示する。
-  // useQueryのerrorと合わせて、画面上部に1つのアラートとしてまとめて出す。
   const displayError =
     error?.message ||
     createMutation.error?.message ||
@@ -99,10 +86,36 @@ export default function MaterialsTab() {
     deactivateMutation.error?.message ||
     reactivateMutation.error?.message;
 
+  // フォームの「登録する/更新する」ボタンが押された瞬間に呼ばれる。
+  // ここではまだAPIを呼ばず、pendingSubmitに値を保持して確認モーダルを開くだけにする。
+  function handleRequestSubmit(formValues) {
+    setPendingSubmit(formValues);
+  }
+
+  // 確認モーダルの「実行する」が押されたら、ここで初めて実際のAPI呼び出しを行う。
+  function handleConfirmSubmit() {
+    if (editingMaterial) {
+      updateMutation.mutate({ materialId: editingMaterial.materialId, material: pendingSubmit });
+    } else {
+      createMutation.mutate(pendingSubmit);
+    }
+    setPendingSubmit(null);
+  }
+
+  function handleRequestDeactivate(materialId) {
+    setPendingDeactivateId(materialId);
+  }
+
+  function handleConfirmDeactivate() {
+    deactivateMutation.mutate(pendingDeactivateId);
+    setPendingDeactivateId(null);
+  }
+
+  // 廃版確認モーダルに表示する対象材料(名前を出したいため一覧から探す)
+  const deactivateTarget = materials.find((m) => m.materialId === pendingDeactivateId);
+
   return (
     <div>
-      {/* 見出し・外枠(container)は親のMastersPage側が持つため、ここでは中身だけを描画する */}
-
       {displayError && (
         <div className="alert alert-danger" role="alert">
           {displayError}
@@ -116,7 +129,7 @@ export default function MaterialsTab() {
             initialValue={editingMaterial ?? emptyForm}
             isEditing={!!editingMaterial}
             isSaving={isSaving}
-            onSubmit={handleSubmit}
+            onSubmit={handleRequestSubmit}
             onCancelEdit={() => setEditingMaterial(null)}
           />
         </div>
@@ -136,12 +149,48 @@ export default function MaterialsTab() {
             <MaterialTable
               materials={materials}
               onEdit={setEditingMaterial}
-              onDeactivate={(id) => deactivateMutation.mutate(id)}
+              onDeactivate={handleRequestDeactivate}
               onReactivate={(id) => reactivateMutation.mutate(id)}
             />
           )}
         </div>
       </div>
+
+      {/* 登録・編集の確認モーダル */}
+      <ConfirmModal
+        show={pendingSubmit !== null}
+        title={editingMaterial ? 'この内容で更新します' : 'この内容で登録します'}
+        confirmLabel={editingMaterial ? '更新する' : '登録する'}
+        summaryLines={
+          pendingSubmit
+            ? [
+                { label: '材料名', value: pendingSubmit.name },
+                { label: '分類', value: categoryLabel(pendingSubmit.category) },
+                { label: '単位系', value: baseUnitLabel(pendingSubmit.baseUnit) },
+                { label: '主原料', value: pendingSubmit.mainMaterial ? 'はい' : 'いいえ' },
+              ]
+            : []
+        }
+        onConfirm={handleConfirmSubmit}
+        onCancel={() => setPendingSubmit(null)}
+      />
+
+      {/* 廃版化の確認モーダル */}
+      <ConfirmModal
+        show={pendingDeactivateId !== null}
+        title="この材料を廃版にします"
+        confirmLabel="廃版にする"
+        summaryLines={
+          deactivateTarget
+            ? [
+                { label: '材料名', value: deactivateTarget.name },
+                { label: '分類', value: categoryLabel(deactivateTarget.category) },
+              ]
+            : []
+        }
+        onConfirm={handleConfirmDeactivate}
+        onCancel={() => setPendingDeactivateId(null)}
+      />
     </div>
   );
 }
@@ -204,8 +253,8 @@ function MaterialTable({ materials, onEdit, onDeactivate, onReactivate }) {
             <tr key={material.materialId} className={material.active ? '' : 'text-muted'}>
               <td>{material.materialId}</td>
               <td>{material.name}</td>
-              <td>{material.category === 'RAW' ? '原料' : '添加物'}</td>
-              <td>{material.baseUnit === 'WEIGHT' ? '重量(g)' : '体積(ml)'}</td>
+              <td>{categoryLabel(material.category)}</td>
+              <td>{baseUnitLabel(material.baseUnit)}</td>
               <td>{material.mainMaterial ? '○' : ''}</td>
               <td>
                 {material.active ? (
@@ -257,7 +306,7 @@ function MaterialForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdi
 
   function handleSubmit(event) {
     event.preventDefault();
-    onSubmit(form);
+    onSubmit(form); // ここでは確認待ちにするだけで、APIはまだ呼ばない(親コンポーネント側で制御)
   }
 
   return (
@@ -322,7 +371,7 @@ function MaterialForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdi
               onChange={handleChange}
             />
             <label htmlFor="mainMaterial" className="form-check-label">
-              主原料(ベーカーズパーセント計算の基準にする)
+              主原料(加水率計算の基準にする)
             </label>
           </div>
 
