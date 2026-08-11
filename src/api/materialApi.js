@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from './client.js';
+import { apiGet, apiPost, apiPut } from "./client.js";
 
 /**
  * 材料の一覧を取得する。filtersは { category, active } の形。
@@ -10,15 +10,21 @@ import { apiGet, apiPost, apiPut } from './client.js';
  */
 export function listMaterials(filters = {}) {
   const params = new URLSearchParams();
-  if (filters.category) params.set('category', filters.category);
-  if (filters.active !== '') params.set('active', filters.active);
+  if (filters.category) params.set("category", filters.category);
+  // filters.active が undefined(そもそも指定されなかった)の場合と、
+  // 空文字 ''(呼び出し側が明示的に「絞り込まない」を選んだ場合)の両方を、
+  // 同じ「絞り込まない」として扱う。以前は空文字だけを見ていたため、
+  // undefinedが素通りして "active=undefined" という不正な文字列がURLに付いてしまっていた。
+  if (filters.active !== undefined && filters.active !== "") {
+    params.set("active", filters.active);
+  }
 
   const query = params.toString();
-  return apiGet(`/materials${query ? `?${query}` : ''}`);
+  return apiGet(`/materials${query ? `?${query}` : ""}`);
 }
 
 export function createMaterial(material) {
-  return apiPost('/materials', material);
+  return apiPost("/materials", material);
 }
 
 export function updateMaterial(materialId, material) {

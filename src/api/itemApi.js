@@ -1,12 +1,12 @@
-import { apiGet, apiPost, apiPut } from "./client.js";
+import { apiGet, apiPost, apiPut } from './client.js';
 
-export function listItems(active = "") {
-  const query = active !== "" ? `?active=${active}` : "";
+export function listItems(active = '') {
+  const query = active !== '' ? `?active=${active}` : '';
   return apiGet(`/items${query}`);
 }
 
 export function createItem(item) {
-  return apiPost("/items", item);
+  return apiPost('/items', item);
 }
 
 export function updateItem(itemId, item) {
