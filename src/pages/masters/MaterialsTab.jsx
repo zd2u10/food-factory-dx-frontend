@@ -1,6 +1,7 @@
 import { useAtom } from 'jotai';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   createMaterial,
   deactivateMaterial,
@@ -265,6 +266,15 @@ function MaterialTable({ materials, onEdit, onDeactivate, onReactivate }) {
               </td>
               <td>
                 <div className="btn-group btn-group-sm">
+                  {/* 産地の概念があるのは原料のみ。添加物には表示しない(UIの切り分け)。 */}
+                  {material.category === 'RAW' && (
+                    <Link
+                      to={`/masters/materials/${material.materialId}/origins`}
+                      className="btn btn-outline-secondary"
+                    >
+                      産地管理
+                    </Link>
+                  )}
                   <button className="btn btn-outline-primary" onClick={() => onEdit(material)}>
                     編集
                   </button>

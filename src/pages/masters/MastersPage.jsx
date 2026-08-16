@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import MaterialsTab from './MaterialsTab.jsx';
 import ItemsTab from './ItemsTab.jsx';
+import CustomersTab from './CustomersTab.jsx';
+import CarriersTab from './CarriersTab.jsx';
 
-// 現時点で中身が実装済みなのは材料・商品タブ。他は「準備中」の空表示にしておき、
-// 今後実装するたびに、この配列にコンポーネントを追加していく想定。
+// 現時点で中身が実装済みなのは材料・商品タブ。
+// レシピは、商品一覧の「レシピ」ボタンから遷移する独立ページ(/masters/items/:itemId/recipe)
+// として実装したため、ここにはタブとして置かない。
 const TABS = [
   { key: 'materials', label: '材料', Component: MaterialsTab },
   { key: 'items', label: '商品', Component: ItemsTab },
-  { key: 'recipes', label: 'レシピ', Component: ComingSoon },
-  { key: 'customers', label: '取引先', Component: ComingSoon },
-  { key: 'carriers', label: '配送会社', Component: ComingSoon },
+  { key: 'customers', label: '取引先', Component: CustomersTab },
+  { key: 'carriers', label: '配送会社', Component: CarriersTab },
 ];
 
 function ComingSoon() {

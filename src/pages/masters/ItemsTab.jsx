@@ -67,8 +67,21 @@ export default function ItemsTab() {
   function handleRequestSubmit(formValues) {
     // targetStockQty(目標在庫)は将来拡張用の項目で、現時点では入力欄を設けていない。
     // DB側はNOT NULLのため、ここでsafetyStockQty(適正在庫)と同じ値を自動的に補って送信する。
-    setPendingSubmit({ ...formValues, targetStockQty: formValues.safetyStockQty });
+    //
+    // 加水基準値(hydration*)は、この画面ではなくレシピ画面(ItemRecipePage)側で入力・更新する。
+    // ここでは既存の値(editingItemに入っている値)をそのまま保持して上書きしないようにする
+    // (新規登録時はundefinedのまま送られ、バックエンド側は未入力として扱う)。
+    setPendingSubmit({
+      ...formValues,
+      targetStockQty: formValues.safetyStockQty,
+      hydrationRatioMin: editingItem?.hydrationRatioMin ?? null,
+      hydrationRatioMax: editingItem?.hydrationRatioMax ?? null,
+      hydrationQtyMin: editingItem?.hydrationQtyMin ?? null,
+      hydrationQtyMax: editingItem?.hydrationQtyMax ?? null,
+    });
   }
+
+  const deactivateTarget = items.find((i) => i.itemId === pendingDeactivateId);
 
   function handleConfirmSubmit() {
     if (editingItem) {
@@ -78,8 +91,6 @@ export default function ItemsTab() {
     }
     setPendingSubmit(null);
   }
-
-  const deactivateTarget = items.find((i) => i.itemId === pendingDeactivateId);
 
   return (
     <div>
