@@ -10,8 +10,18 @@ import {
 } from '../../api/packageSpecApi.js';
 import ConfirmModal from '../../components/ConfirmModal.jsx';
 
-const emptyForm = { origin: '', packageWeight: '', packageUnitLabel: '' };
+const emptyForm = { origin: '', packageWeight: '', packageUnitLabel: '', canMix: false };
 
+/**
+ * 材料ごとの梱包仕様(material_package_spec)を管理する画面。
+ *
+ * origin(産地)は、原料のFEFO計算(産地+賞味期限のルール)に本質的に必要な情報だが、
+ * 添加物のFEFO計算は賞味期限のみで行うため、産地という概念自体が不要。
+ * そのため、材料の分類(category)によって画面の見せ方を切り替える:
+ *   原料(RAW)   : 「産地」として人が入力する(FEFOの産地フィルターに使われる)
+ *   添加物(ADDITIVE): 産地入力欄を隠し、内部的に自動生成した値を裏側でoriginに入れておく。
+ *                     画面には「梱包仕様: 20000g / 袋」のように、重量と単位だけを見せる
+ */
 export default function MaterialOriginsPage() {
   const { materialId } = useParams();
   const numericMaterialId = Number(materialId);
@@ -29,6 +39,7 @@ export default function MaterialOriginsPage() {
   });
 
   const material = materials.find((m) => m.materialId === numericMaterialId);
+  const isRaw = material?.category === 'RAW';
 
   const createMutation = useMutation({
     mutationFn: (payload) => createPackageSpec(numericMaterialId, payload),
@@ -53,8 +64,13 @@ export default function MaterialOriginsPage() {
 
   function handleRequestSubmit(formValues) {
     setPendingSubmit({
-      ...formValues,
+      // 添加物の場合、originは人に入力させず、ここで自動生成する
+      // (originはFEFOでは使われないが、DB側がNOT NULLのため、識別用の形式的な値を入れておく)。
+      origin: isRaw ? formValues.origin : `spec-${crypto.randomUUID().slice(0, 8)}`,
       packageWeight: Number(formValues.packageWeight),
+      packageUnitLabel: formValues.packageUnitLabel,
+      // canMixは原料のみの概念(発注時の産地グループ化に使う)。添加物は常にfalseにしておく。
+      canMix: isRaw ? formValues.canMix : false,
     });
   }
 
@@ -72,7 +88,9 @@ export default function MaterialOriginsPage() {
       <Link to="/masters" className="d-inline-block mb-3">
         ← マスタ管理へ戻る
       </Link>
-      <h1 className="h4 mb-4">{material ? `${material.name} の産地管理` : '産地管理'}</h1>
+      <h1 className="h4 mb-4">
+        {material ? `${material.name} の${isRaw ? '産地' : '梱包仕様'}管理` : '産地・梱包仕様管理'}
+      </h1>
 
       <div className="row g-4">
         <div className="col-12 col-lg-5">
@@ -80,6 +98,7 @@ export default function MaterialOriginsPage() {
             key={editingSpec ? editingSpec.specId : 'new'}
             initialValue={editingSpec ?? emptyForm}
             isEditing={!!editingSpec}
+            isRaw={isRaw}
             isSaving={createMutation.isPending || updateMutation.isPending}
             onSubmit={handleRequestSubmit}
             onCancelEdit={() => setEditingSpec(null)}
@@ -87,27 +106,29 @@ export default function MaterialOriginsPage() {
         </div>
 
         <div className="col-12 col-lg-7">
-          <h2 className="h5 mb-3">登録済みの産地</h2>
+          <h2 className="h5 mb-3">登録済みの{isRaw ? '産地' : '梱包仕様'}</h2>
           {isLoading ? (
             <p className="text-muted">読み込み中...</p>
           ) : specs.length === 0 ? (
-            <p className="text-muted">まだ産地が登録されていません。</p>
+            <p className="text-muted">まだ登録されていません。</p>
           ) : (
             <table className="table table-striped align-middle">
               <thead>
                 <tr>
-                  <th>産地</th>
+                  {isRaw && <th>産地</th>}
                   <th>目安数量</th>
                   <th>単位表示</th>
+                  {isRaw && <th>他産地と混在可</th>}
                   <th>操作</th>
                 </tr>
               </thead>
               <tbody>
                 {specs.map((spec) => (
                   <tr key={spec.specId}>
-                    <td>{spec.origin}</td>
+                    {isRaw && <td>{spec.origin}</td>}
                     <td>{spec.packageWeight}</td>
                     <td>{spec.packageUnitLabel}</td>
+                    {isRaw && <td>{spec.canMix ? '○' : ''}</td>}
                     <td>
                       <div className="btn-group btn-group-sm">
                         <button className="btn btn-outline-primary" onClick={() => setEditingSpec(spec)}>
@@ -131,14 +152,17 @@ export default function MaterialOriginsPage() {
 
       <ConfirmModal
         show={pendingSubmit !== null}
-        title={editingSpec ? 'この内容で更新します' : 'この産地を登録します'}
+        title={editingSpec ? 'この内容で更新します' : 'この内容で登録します'}
         confirmLabel={editingSpec ? '更新する' : '登録する'}
         summaryLines={
           pendingSubmit
             ? [
-                { label: '産地', value: pendingSubmit.origin },
+                ...(isRaw ? [{ label: '産地', value: pendingSubmit.origin }] : []),
                 { label: '目安数量', value: pendingSubmit.packageWeight },
                 { label: '単位表示', value: pendingSubmit.packageUnitLabel },
+                ...(isRaw
+                  ? [{ label: '複数の産地が混在する可能性', value: pendingSubmit.canMix ? 'あり' : 'なし' }]
+                  : []),
               ]
             : []
         }
@@ -148,11 +172,19 @@ export default function MaterialOriginsPage() {
 
       <ConfirmModal
         show={pendingDeleteId !== null}
-        title="この産地を削除します"
+        title="この登録内容を削除します"
         confirmLabel="削除する"
         summaryLines={
           pendingDeleteId
-            ? [{ label: '産地', value: specs.find((s) => s.specId === pendingDeleteId)?.origin }]
+            ? [
+                {
+                  label: isRaw ? '産地' : '梱包仕様',
+                  value: (() => {
+                    const s = specs.find((sp) => sp.specId === pendingDeleteId);
+                    return isRaw ? s?.origin : `${s?.packageWeight} / ${s?.packageUnitLabel}`;
+                  })(),
+                },
+              ]
             : []
         }
         onConfirm={() => {
@@ -165,7 +197,7 @@ export default function MaterialOriginsPage() {
   );
 }
 
-function SpecForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit }) {
+function SpecForm({ initialValue, isEditing, isRaw, isSaving, onSubmit, onCancelEdit }) {
   const [form, setForm] = useState(initialValue);
 
   function handleChange(event) {
@@ -181,29 +213,40 @@ function SpecForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit })
   return (
     <div className="card">
       <div className="card-body">
-        <h2 className="h5 card-title">{isEditing ? '産地を編集' : '産地を追加'}</h2>
-        <p className="text-muted small mb-3">
-          ここでの「1件」は「1つの産地を基準とした1件分のデータ(産地名・目安数量・単位表示のセット)」を指します。
-          <br />
-          複数の産地を扱う場合(例:愛知・三重・新潟)は、まとめて1件で登録せず、
-          「愛知」で1件登録→「三重」で1件登録、というように<strong>産地ごとに分けて1件ずつ</strong>登録してください。
-        </p>
+        <h2 className="h5 card-title">
+          {isEditing ? `${isRaw ? '産地' : '梱包仕様'}を編集` : `${isRaw ? '産地' : '梱包仕様'}を追加`}
+        </h2>
+        {isRaw ? (
+          <p className="text-muted small mb-3">
+            ここでの「1件」は「1つの産地を基準とした1件分のデータ(産地名・目安数量・単位表示のセット)」を指します。
+            <br />
+            複数の産地を扱う場合(例:愛知・三重・新潟)は、まとめて1件で登録せず、
+            「愛知」で1件登録→「三重」で1件登録、というように<strong>産地ごとに分けて1件ずつ</strong>登録してください。
+          </p>
+        ) : (
+          <p className="text-muted small mb-3">
+            添加物は産地を区別しないため、ここでは「1箱/袋あたりの重量」と「単位表示」だけを登録します。
+            梱包の種類が複数ある場合(例:20kg袋と10kg缶の両方を仕入れる)は、それぞれ分けて登録してください。
+          </p>
+        )}
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label htmlFor="origin" className="form-label">
-              産地(1件につき1つの産地名を入力)
-            </label>
-            <input
-              id="origin"
-              name="origin"
-              type="text"
-              className="form-control"
-              value={form.origin}
-              onChange={handleChange}
-              placeholder="例: 愛知(カンマ区切りでの複数入力は不可)"
-              required
-            />
-          </div>
+          {isRaw && (
+            <div className="mb-3">
+              <label htmlFor="origin" className="form-label">
+                産地(1件につき1つの産地名を入力)
+              </label>
+              <input
+                id="origin"
+                name="origin"
+                type="text"
+                className="form-control"
+                value={form.origin}
+                onChange={handleChange}
+                placeholder="例: 愛知(カンマ区切りでの複数入力は不可)"
+                required
+              />
+            </div>
+          )}
           <div className="mb-3">
             <label htmlFor="packageWeight" className="form-label">
               1箱/袋あたりの目安数量(g/ml)
@@ -232,6 +275,26 @@ function SpecForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit })
               required
             />
           </div>
+          {isRaw && (
+            <div className="form-check mb-3">
+              <input
+                id="canMix"
+                name="canMix"
+                type="checkbox"
+                className="form-check-input"
+                checked={form.canMix}
+                onChange={(e) => setForm((prev) => ({ ...prev, canMix: e.target.checked }))}
+              />
+              <label htmlFor="canMix" className="form-check-label">
+                複数の産地が混在する可能性はありますか?
+              </label>
+              <div className="form-text">
+                チェックを入れると、発注時にこの産地は「重量・単位が一致する他の産地」と自動的にまとめられ、
+                1つの選択肢(例:「愛知or三重」)として表示されます。
+                この産地に限定した発注をしたい場合(例:特別レシピ用)は、チェックを入れないでください。
+              </div>
+            </div>
+          )}
           <div className="d-flex gap-2">
             <button type="submit" className="btn btn-primary flex-grow-1" disabled={isSaving}>
               {isSaving ? '送信中...' : isEditing ? '更新する' : '登録する'}

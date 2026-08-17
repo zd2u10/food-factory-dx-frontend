@@ -266,15 +266,18 @@ function MaterialTable({ materials, onEdit, onDeactivate, onReactivate }) {
               </td>
               <td>
                 <div className="btn-group btn-group-sm">
-                  {/* 産地の概念があるのは原料のみ。添加物には表示しない(UIの切り分け)。 */}
-                  {material.category === 'RAW' && (
-                    <Link
-                      to={`/masters/materials/${material.materialId}/origins`}
-                      className="btn btn-outline-secondary"
-                    >
-                      産地管理
-                    </Link>
-                  )}
+                  {/*
+                    原料は「産地」、添加物は「梱包仕様」というラベルの違いはあるが、
+                    どちらも material_package_spec の登録が必要なため、両方に表示する。
+                    (以前は原料のみに表示していたが、添加物にも梱包仕様(重量・単位)の
+                     登録が必要なことが分かったため、全材料共通のボタンに変更した)
+                  */}
+                  <Link
+                    to={`/masters/materials/${material.materialId}/origins`}
+                    className="btn btn-outline-secondary"
+                  >
+                    {material.category === 'RAW' ? '産地管理' : '梱包仕様管理'}
+                  </Link>
                   <button className="btn btn-outline-primary" onClick={() => onEdit(material)}>
                     編集
                   </button>

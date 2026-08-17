@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { listMaterialOrders, listOrderLines } from '../../api/materialOrderApi.js';
 import { listMaterials } from '../../api/materialApi.js';
+import { listOpenHolds } from '../../api/holdApi.js';
 
 const STATUS_LABEL = {
   NOT_ARRIVED: { text: '未入荷', className: 'text-bg-secondary' },
@@ -9,7 +10,11 @@ const STATUS_LABEL = {
   FULLY_ARRIVED: { text: '入荷完了', className: 'text-bg-success' },
 };
 
-/** 1つの発注の入荷状況(充足内訳)を表示する画面。 */
+/**
+ * 1つの発注の入荷状況(充足内訳)を表示する画面。
+ * 保留数量が残っている明細には「保留対応」ボタンを表示し、
+ * 対応する保留(hold_resolution)を見つけて、入荷登録画面の交換対応モードへ引き継ぐ。
+ */
 export default function OrderDetailPage() {
   const { orderId } = useParams();
   const numericOrderId = Number(orderId);
@@ -20,11 +25,19 @@ export default function OrderDetailPage() {
     queryKey: ['orderLines', numericOrderId],
     queryFn: () => listOrderLines(numericOrderId),
   });
+  // 対応待ちの保留を全件取得し、明細のlineIdと突き合わせる。
+  // hold_resolutionはorderIdを直接持たないため、「この明細(lineId)に対応する保留はどれか」を
+  // フロント側でlineId一致によって探し出す(バックエンド改修は不要)。
+  const { data: holds = [] } = useQuery({ queryKey: ['holds'], queryFn: listOpenHolds });
 
   const order = orders.find((o) => o.orderId === numericOrderId);
 
   function materialName(materialId) {
     return materials.find((m) => m.materialId === materialId)?.name ?? `材料ID:${materialId}`;
+  }
+
+  function findHoldForLine(lineId) {
+    return holds.find((h) => h.lineId === lineId);
   }
 
   const totalAccepted = lines.reduce((sum, l) => sum + Number(l.acceptedQty), 0);
@@ -60,23 +73,43 @@ export default function OrderDetailPage() {
               <th>賞味期限</th>
               <th>合格数量</th>
               <th>保留数量</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
-            {lines.map((line) => (
-              <tr key={line.lineId}>
-                <td>{line.supplierLotNo}</td>
-                <td>{line.origin}</td>
-                <td>{line.expiryDate}</td>
-                <td>{line.acceptedQty}</td>
-                <td>{line.heldQty}</td>
-              </tr>
-            ))}
+            {lines.map((line) => {
+              const hasHold = Number(line.heldQty) > 0;
+              const hold = hasHold ? findHoldForLine(line.lineId) : null;
+              return (
+                <tr key={line.lineId} className={hasHold ? 'table-warning' : ''}>
+                  <td>{line.supplierLotNo}</td>
+                  <td>{line.origin}</td>
+                  <td>{line.expiryDate}</td>
+                  <td>{line.acceptedQty}</td>
+                  <td>
+                    {line.heldQty}
+                    {hasHold && <span className="badge text-bg-warning ms-2">保留</span>}
+                  </td>
+                  <td>
+                    {hold ? (
+                      <Link
+                        to={`/procurement/orders/${numericOrderId}/arrivals/new?resolvesHoldId=${hold.holdId}`}
+                        className="btn btn-outline-warning btn-sm"
+                      >
+                        保留対応
+                      </Link>
+                    ) : hasHold ? (
+                      <span className="text-muted small">対応済み</span>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
 
-      <Link to="/procurement/arrivals/new" className="btn btn-primary mt-3">
+      <Link to={`/procurement/orders/${numericOrderId}/arrivals/new`} className="btn btn-primary mt-3">
         新しい入荷を登録する
       </Link>
     </div>
