@@ -6,7 +6,6 @@ import MaterialOriginsPage from './pages/masters/MaterialOriginsPage.jsx';
 import ProcurementPage from './pages/procurement/ProcurementPage.jsx';
 import NewArrivalPage from './pages/procurement/NewArrivalPage.jsx';
 import OrderDetailPage from './pages/procurement/OrderDetailPage.jsx';
-import HoldsPage from './pages/procurement/HoldsPage.jsx';
 import InventoryPage from './pages/inventory/InventoryPage.jsx';
 import ManufacturingPage from './pages/manufacturing/ManufacturingPage.jsx';
 import BatchExecutionPage from './pages/manufacturing/BatchExecutionPage.jsx';
@@ -28,7 +27,6 @@ export default function App() {
           <Route path="/procurement/orders/:orderId" element={<OrderDetailPage />} />
           {/* 発注一覧・発注詳細から直接遷移する、発注専用の入荷登録画面 */}
           <Route path="/procurement/orders/:orderId/arrivals/new" element={<NewArrivalPage />} />
-          <Route path="/procurement/holds" element={<HoldsPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/manufacturing" element={<ManufacturingPage />} />
           <Route path="/manufacturing/batches/:batchId" element={<BatchExecutionPage />} />

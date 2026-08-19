@@ -3,6 +3,7 @@ import MaterialsTab from './MaterialsTab.jsx';
 import ItemsTab from './ItemsTab.jsx';
 import CustomersTab from './CustomersTab.jsx';
 import CarriersTab from './CarriersTab.jsx';
+import SuppliersTab from './SuppliersTab.jsx';
 
 // 現時点で中身が実装済みなのは材料・商品タブ。
 // レシピは、商品一覧の「レシピ」ボタンから遷移する独立ページ(/masters/items/:itemId/recipe)
@@ -12,6 +13,7 @@ const TABS = [
   { key: 'items', label: '商品', Component: ItemsTab },
   { key: 'customers', label: '取引先', Component: CustomersTab },
   { key: 'carriers', label: '配送会社', Component: CarriersTab },
+  { key: 'suppliers', label: '仕入先', Component: SuppliersTab },
 ];
 
 function ComingSoon() {

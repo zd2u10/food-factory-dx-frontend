@@ -9,6 +9,7 @@ import {
   rejectBatch,
 } from '../../api/manufacturingApi.js';
 import { listItems } from '../../api/itemApi.js';
+import { listMaterials } from '../../api/materialApi.js';
 import { DialPadField } from '../../components/DialPad.jsx';
 import ConfirmModal from '../../components/ConfirmModal.jsx';
 
@@ -73,6 +74,11 @@ function ExecuteSection({ batch, onDone }) {
     queryKey: ['fefoPreview', batch.itemId],
     queryFn: () => previewFefo(batch.itemId),
   });
+  const { data: materials = [] } = useQuery({ queryKey: ['materials'], queryFn: () => listMaterials({}) });
+
+  function isRawMaterial(materialId) {
+    return materials.find((m) => m.materialId === materialId)?.category === 'RAW';
+  }
 
   const executeMutation = useMutation({
     mutationFn: (payload) => executeBatch(batch.batchId, payload),
@@ -112,7 +118,8 @@ function ExecuteSection({ batch, onDone }) {
               <div className="card-body">
                 <p className="mb-1 fw-bold">ロット: {line.supplierLotNo}</p>
                 <p className="text-muted small mb-2">
-                  産地: {line.origin} / 参考(理論値): {line.allocatedQty}
+                  {isRawMaterial(line.materialId) && <>産地: {line.origin} / </>}
+                  参考(理論値): {line.allocatedQty}
                 </p>
                 <DialPadField
                   label="実測使用量"
