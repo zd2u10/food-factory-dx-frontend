@@ -150,7 +150,7 @@ export default function SuppliersTab() {
                         )}
                       </td>
                       <td>
-                        <div className="btn-group btn-group-sm">
+                        <div className="btn-group btn-group-sm gap-2">
                           <button className="btn btn-primary" onClick={() => setEditingSupplier(supplier)}>
                             編集
                           </button>

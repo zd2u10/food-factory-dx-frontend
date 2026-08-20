@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { listItems, updateItem } from '../../api/itemApi.js';
 import { listMaterials } from '../../api/materialApi.js';
 import { listPackageSpecs } from '../../api/packageSpecApi.js';
+import { materialUnitLabel } from '../../utils/unitLabel.js';
 import {
   createRecipeItemsBulk,
   deleteRecipeItem,
@@ -49,6 +50,10 @@ export default function ItemRecipePage() {
 
   function materialName(materialId) {
     return materials.find((m) => m.materialId === materialId)?.name ?? `材料ID:${materialId}`;
+  }
+
+  function materialUnit(materialId) {
+    return materialUnitLabel(materials.find((m) => m.materialId === materialId)?.baseUnit);
   }
 
   // 主原料の使用量(加水率↔加水量の換算基準)。
@@ -150,10 +155,10 @@ export default function ItemRecipePage() {
           </div>
 
           <div className="d-flex gap-2 mt-3 flex-wrap">
-            <button type="button" className="btn btn-outline-primary" onClick={() => addRow('RAW')}>
+            <button type="button" className="btn btn-primary" onClick={() => addRow('RAW')}>
               + 原料を追加
             </button>
-            <button type="button" className="btn btn-outline-secondary" onClick={() => addRow('ADDITIVE')}>
+            <button type="button" className="btn btn-secondary" onClick={() => addRow('ADDITIVE')}>
               + 添加物を追加
             </button>
           </div>
@@ -186,17 +191,17 @@ export default function ItemRecipePage() {
                   <div className="card-body">
                     <div className="d-flex justify-content-between align-items-start">
                       <h3 className="h6 card-title">{materialName(line.materialId)}</h3>
-                      <div className="btn-group btn-group-sm">
+                      <div className="btn-group btn-group-sm gap-2">
                         <button
                           type="button"
-                          className="btn btn-outline-primary"
+                          className="btn btn-primary"
                           onClick={() => setEditingLine(line)}
                         >
                           編集
                         </button>
                         <button
                           type="button"
-                          className="btn btn-outline-danger"
+                          className="btn btn-danger"
                           onClick={() => setPendingDeleteLine(line)}
                         >
                           削除
@@ -205,7 +210,7 @@ export default function ItemRecipePage() {
                     </div>
                     <dl className="row small mb-0">
                       <dt className="col-6">使用量</dt>
-                      <dd className="col-6">{line.useQty}</dd>
+                      <dd className="col-6">{line.useQty}{materialUnit(line.materialId)}</dd>
                       <dt className="col-6">許可産地</dt>
                       <dd className="col-6">{line.allowedOrigins || '(添加物のため対象外)'}</dd>
                       <dt className="col-6">主原料</dt>
@@ -254,7 +259,7 @@ export default function ItemRecipePage() {
           pendingBulkSubmit
             ? pendingBulkSubmit.map((line, index) => ({
                 label: `${index + 1}. ${materialName(line.materialId)}`,
-                value: `${line.useQty}`,
+                value: `${line.useQty}${materialUnit(line.materialId)}`,
               }))
             : []
         }
@@ -282,7 +287,7 @@ export default function ItemRecipePage() {
           pendingEditSubmit
             ? [
                 { label: '材料', value: materialName(pendingEditSubmit.materialId) },
-                { label: '使用量', value: pendingEditSubmit.useQty },
+                { label: '使用量', value: `${pendingEditSubmit.useQty}${materialUnit(pendingEditSubmit.materialId)}` },
                 { label: '許可産地', value: pendingEditSubmit.allowedOrigins },
                 { label: '主原料', value: pendingEditSubmit.mainMaterial ? 'はい' : 'いいえ' },
                 { label: '液体', value: pendingEditSubmit.liquid ? 'はい' : 'いいえ' },
@@ -304,7 +309,7 @@ export default function ItemRecipePage() {
           pendingDeleteLine
             ? [
                 { label: '材料', value: materialName(pendingDeleteLine.materialId) },
-                { label: '使用量', value: pendingDeleteLine.useQty },
+                { label: '使用量', value: `${pendingDeleteLine.useQty}${materialUnit(pendingDeleteLine.materialId)}` },
               ]
             : []
         }
@@ -451,7 +456,7 @@ function HydrationForm({ item, mainMaterialQty, isSaving, onRequestSubmit }) {
               />
             </div>
           </div>
-          <button type="submit" className="btn btn-outline-primary btn-sm" disabled={isSaving}>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={isSaving}>
             {isSaving ? '送信中...' : '加水基準値を更新'}
           </button>
         </form>

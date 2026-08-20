@@ -67,7 +67,7 @@ export default function PlanByDateTab() {
                     </div>
                     <div className="d-flex align-items-center gap-2">
                       <span className={`badge ${statusInfo.className}`}>{statusInfo.text}</span>
-                      <Link to={`/manufacturing/batches/${batch.batchId}`} className="btn btn-outline-primary btn-sm">
+                      <Link to={`/manufacturing/batches/${batch.batchId}`} className="btn btn-primary btn-sm">
                         詳細へ
                       </Link>
                     </div>

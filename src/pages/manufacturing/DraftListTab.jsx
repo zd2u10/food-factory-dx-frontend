@@ -100,7 +100,7 @@ export default function DraftListTab() {
                 <td>
                   <button
                     type="button"
-                    className="btn btn-outline-danger btn-sm"
+                    className="btn btn-danger btn-sm"
                     onClick={() => setPendingCancelBatch(batch)}
                   >
                     取り消す

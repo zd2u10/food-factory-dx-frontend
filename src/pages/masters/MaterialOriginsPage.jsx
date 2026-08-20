@@ -130,12 +130,12 @@ export default function MaterialOriginsPage() {
                     <td>{spec.packageUnitLabel}</td>
                     {isRaw && <td>{spec.canMix ? '○' : ''}</td>}
                     <td>
-                      <div className="btn-group btn-group-sm">
-                        <button className="btn btn-outline-primary" onClick={() => setEditingSpec(spec)}>
+                      <div className="btn-group btn-group-sm gap-2">
+                        <button className="btn btn-primary" onClick={() => setEditingSpec(spec)}>
                           編集
                         </button>
                         <button
-                          className="btn btn-outline-danger"
+                          className="btn btn-danger"
                           onClick={() => setPendingDeleteId(spec.specId)}
                         >
                           削除

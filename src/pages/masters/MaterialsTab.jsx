@@ -221,7 +221,7 @@ function FilterBar({ categoryFilter, activeFilter, onCategoryChange, onActiveCha
         <option value="false">廃版のもののみ</option>
       </select>
 
-      <button className="btn btn-outline-secondary btn-sm" onClick={onReload}>
+      <button className="btn btn-secondary btn-sm" onClick={onReload}>
         再読み込み
       </button>
     </div>
@@ -265,7 +265,7 @@ function MaterialTable({ materials, onEdit, onDeactivate, onReactivate }) {
                 )}
               </td>
               <td>
-                <div className="btn-group btn-group-sm">
+                <div className="btn-group btn-group-sm gap-2">
                   {/*
                     原料は「産地」、添加物は「梱包仕様」というラベルの違いはあるが、
                     どちらも material_package_spec の登録が必要なため、両方に表示する。

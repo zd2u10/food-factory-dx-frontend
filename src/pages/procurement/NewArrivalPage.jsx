@@ -8,6 +8,7 @@ import { listMaterialOrders, listOrderLines } from '../../api/materialOrderApi.j
 import { listOpenHolds, resolveAsAcceptedLate } from '../../api/holdApi.js';
 import { listSuppliers } from '../../api/supplierApi.js';
 import ConfirmModal from '../../components/ConfirmModal.jsx';
+import { materialUnitLabel } from '../../utils/unitLabel.js';
 
 /**
  * 1つの産地(または保留対応)につき1ブロック分の入力値。
@@ -95,6 +96,7 @@ export default function NewArrivalPage() {
 
   const effectiveMaterial = materials.find((m) => m.materialId === effectiveMaterialId);
   const isRaw = effectiveMaterial?.category === 'RAW';
+  const unit = materialUnitLabel(effectiveMaterial?.baseUnit); // 現場が数字の意味を一瞬で判断できるよう、常に単位を添える
   // 添加物は「1材料につき梱包仕様は常に1件」という前提のため、選択の余地が無い。
   // specsが取得できた時点で、その唯一の仕様を自動的に選択済みにしておく。
   useEffect(() => {
@@ -343,6 +345,7 @@ export default function NewArrivalPage() {
               specs={specs}
               holds={holds}
               isRaw={isRaw}
+              unit={unit}
               onChange={(patch) => updateOriginBlock(block.key, patch)}
               onRemove={originBlocks.length > 1 ? () => removeOriginBlock(block.key) : null}
               onAddLot={() => addLot(block.key)}
@@ -359,7 +362,7 @@ export default function NewArrivalPage() {
             そのため、添加物を選んでいる場合はこのボタン自体を表示しない。
           */}
           {isRaw && (
-            <button type="button" className="btn btn-outline-primary w-100 mb-3" onClick={addOriginBlock}>
+            <button type="button" className="btn btn-primary w-100 mb-3" onClick={addOriginBlock}>
               + 産地を追加
             </button>
           )}
@@ -395,8 +398,8 @@ export default function NewArrivalPage() {
                     <td>{line.supplierLotNo}</td>
                     {isRaw && <td>{line.origin}</td>}
                     <td>{line.expiryDate}</td>
-                    <td>{line.acceptedQty}</td>
-                    <td>{line.heldQty}</td>
+                    <td>{line.acceptedQty}{unit}</td>
+                    <td>{line.heldQty}{unit}</td>
                   </tr>
                 ))}
               </tbody>
@@ -433,7 +436,7 @@ export default function NewArrivalPage() {
   );
 }
 
-function OriginBlockForm({ block, specs, holds, isRaw, onChange, onRemove, onAddLot, onRemoveLot, onUpdateLot, onAcceptLate, isAcceptLatePending }) {
+function OriginBlockForm({ block, specs, holds, isRaw, unit, onChange, onRemove, onAddLot, onRemoveLot, onUpdateLot, onAcceptLate, isAcceptLatePending }) {
   const selectedHold = holds.find((h) => h.holdId === Number(block.resolvesHoldId));
 
   return (
@@ -492,7 +495,7 @@ function OriginBlockForm({ block, specs, holds, isRaw, onChange, onRemove, onAdd
               </option>
               {holds.map((h) => (
                 <option key={h.holdId} value={h.holdId}>
-                  保留ID{h.holdId}(保留数量{h.heldQtySnapshot})
+                  保留ID{h.holdId}(保留数量{h.heldQtySnapshot}{unit})
                 </option>
               ))}
             </select>
@@ -505,7 +508,7 @@ function OriginBlockForm({ block, specs, holds, isRaw, onChange, onRemove, onAdd
           <div>
             {selectedHold && (
               <p className="text-muted small">
-                保留数量{selectedHold.heldQtySnapshot}分を、そのまま合格として受け入れます。
+                保留数量{selectedHold.heldQtySnapshot}{unit}分を、そのまま合格として受け入れます。
                 新しく入力する項目はありません。
               </p>
             )}
@@ -652,7 +655,7 @@ function OriginBlockForm({ block, specs, holds, isRaw, onChange, onRemove, onAdd
           </div>
         ))}
 
-        <button type="button" className="btn btn-outline-secondary btn-sm w-100" onClick={onAddLot}>
+        <button type="button" className="btn btn-secondary btn-sm w-100" onClick={onAddLot}>
           {isRaw ? '+ この産地にロットを追加' : '+ ロットを追加'}
         </button>
           </>

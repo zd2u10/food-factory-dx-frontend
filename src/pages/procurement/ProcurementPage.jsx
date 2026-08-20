@@ -6,6 +6,8 @@ import { listMaterials } from '../../api/materialApi.js';
 import { listPackageSpecs } from '../../api/packageSpecApi.js';
 import { listSuppliers } from '../../api/supplierApi.js';
 import ConfirmModal from '../../components/ConfirmModal.jsx';
+import { buildOriginGroups } from '../../utils/originGrouping.js';
+import { materialUnitLabel } from '../../utils/unitLabel.js';
 
 const emptyForm = {
   materialId: '',
@@ -21,68 +23,6 @@ const STATUS_LABEL = {
   PARTIALLY_ARRIVED: { text: '一部入荷', className: 'text-bg-warning' },
   FULLY_ARRIVED: { text: '入荷完了', className: 'text-bg-success' },
 };
-
-/**
- * 選んだ材料の梱包仕様(specs)から、発注フォームで表示するセレクトボックスの選択肢を組み立てる。
- *
- * 【原料の場合】
- * canMix=trueの産地同士は、重量+単位が完全に一致するものだけを自動的にグループ化し、
- * 「愛知or三重」のように1つの選択肢としてまとめる(要件定義で確定した設計)。
- * canMix=falseの産地(例: 特別レシピ用の山梨)は、重量が他と同じであっても、
- * 常に単独の選択肢として扱う。
- *
- * 【添加物の場合】
- * 産地という概念自体が無いため、can_mixによるグループ化は行わず、
- * 登録されている梱包仕様(重量+単位)を、そのまま1つずつ選択肢にする。
- *
- * 戻り値: [{ key, label, origins, packageWeight, packageUnitLabel }, ...]
- */
-function buildOriginGroups(specs, isRaw) {
-  if (!isRaw) {
-    // 添加物: canMixによるグループ化を行わず、登録されている仕様をそのまま選択肢にする。
-    return specs.map((spec) => ({
-      key: `fixed-${spec.specId}`,
-      label: `${spec.packageWeight} / ${spec.packageUnitLabel}`,
-      labelIncludesWeight: true, // labelに既に重量/単位が含まれているため、表示側で付け足さない
-      origins: [spec.origin],
-      packageWeight: spec.packageWeight,
-      packageUnitLabel: spec.packageUnitLabel,
-    }));
-  }
-
-  const mixable = specs.filter((s) => s.canMix);
-  const fixed = specs.filter((s) => !s.canMix);
-
-  // canMix=trueの産地を、「重量+単位」が完全一致するものごとにグループ化する。
-  const groupMap = new Map(); // key: "15000-袋" のような文字列 → { origins: [], packageWeight, packageUnitLabel }
-  for (const spec of mixable) {
-    const key = `${spec.packageWeight}-${spec.packageUnitLabel}`;
-    if (!groupMap.has(key)) {
-      groupMap.set(key, { origins: [], packageWeight: spec.packageWeight, packageUnitLabel: spec.packageUnitLabel });
-    }
-    groupMap.get(key).origins.push(spec.origin);
-  }
-
-  const groups = Array.from(groupMap.entries()).map(([key, g]) => ({
-    key,
-    label: g.origins.join('or'),
-    labelIncludesWeight: false,
-    origins: g.origins,
-    packageWeight: g.packageWeight,
-    packageUnitLabel: g.packageUnitLabel,
-  }));
-
-  const fixedGroups = fixed.map((spec) => ({
-    key: `fixed-${spec.specId}`,
-    label: spec.origin,
-    labelIncludesWeight: false,
-    origins: [spec.origin],
-    packageWeight: spec.packageWeight,
-    packageUnitLabel: spec.packageUnitLabel,
-  }));
-
-  return [...groups, ...fixedGroups];
-}
 
 /**
  * 発注の一覧・登録画面。
@@ -115,6 +55,10 @@ export default function ProcurementPage() {
 
   function materialName(materialId) {
     return materials.find((m) => m.materialId === materialId)?.name ?? `材料ID:${materialId}`;
+  }
+
+  function materialUnit(materialId) {
+    return materialUnitLabel(materials.find((m) => m.materialId === materialId)?.baseUnit);
   }
 
   function supplierName(supplierId) {
@@ -167,7 +111,7 @@ export default function ProcurementPage() {
       <h1 className="h3 mb-4">発注・入荷</h1>
 
       <div className="d-flex gap-2 mb-4">
-        <Link to="/procurement/arrivals/new" className="btn btn-outline-primary">
+        <Link to="/procurement/arrivals/new" className="btn btn-primary">
           予定外の入荷を登録する
         </Link>
         <button type="button" className="btn btn-success ms-auto" onClick={() => setShowForm((prev) => !prev)}>
@@ -301,7 +245,7 @@ export default function ProcurementPage() {
             ? [
                 { label: '材料', value: materialName(pendingSubmit.materialId) },
                 { label: '仕入先', value: supplierName(pendingSubmit.supplierId) },
-                { label: '発注数量', value: pendingSubmit.orderQty },
+                { label: '発注数量', value: `${pendingSubmit.orderQty}${materialUnit(pendingSubmit.materialId)}` },
                 { label: '許可産地', value: pendingSubmit.allowedOrigins ?? '(指定なし)' },
                 { label: '発注日', value: pendingSubmit.orderDate },
                 { label: '納品予定日', value: pendingSubmit.expectedDate ?? '(未定)' },
@@ -345,7 +289,7 @@ function OrderRow({ order, materials, materialName, supplierName }) {
 
   const qtyDisplay = representativeSpec
     ? `${Math.round(Number(order.orderQty) / Number(representativeSpec.packageWeight))}${representativeSpec.packageUnitLabel}`
-    : order.orderQty;
+    : `${order.orderQty}${materialUnitLabel(material?.baseUnit)}`;
 
   // allowedOriginsの中身は、添加物の場合「spec-xxxxxxxx」という内部識別用の値であり、
   // 人が見て意味のあるものではないため表示しない。原料の場合のみ、実際の産地名を表示する。
@@ -361,6 +305,11 @@ function OrderRow({ order, materials, materialName, supplierName }) {
       <td>{order.orderDate}</td>
       <td>
         <span className={`badge ${statusInfo.className}`}>{statusInfo.text}</span>
+        {order.hasHoldHistory && (
+          <span className="badge text-bg-warning ms-1" title="この発注では、過去に保留が発生しています">
+            ⚠ 保留対応あり
+          </span>
+        )}
       </td>
       <td>
         <div className="btn-group btn-group-sm gap-2">
@@ -517,8 +466,8 @@ function OrderForm({ materials, suppliers, onSubmit, isSaving }) {
             />
             {selectedGroup && (
               <div className="form-text">
-                合計量(自動計算): {orderQty ?? 0}
-                (1{selectedGroup.packageUnitLabel} = {selectedGroup.packageWeight}として計算)
+                合計量(自動計算): {orderQty ?? 0}{materialUnitLabel(selectedMaterial?.baseUnit)}
+                (1{selectedGroup.packageUnitLabel} = {selectedGroup.packageWeight}{materialUnitLabel(selectedMaterial?.baseUnit)}として計算)
               </div>
             )}
           </div>

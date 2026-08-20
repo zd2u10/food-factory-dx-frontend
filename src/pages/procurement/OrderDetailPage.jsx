@@ -4,6 +4,7 @@ import { listMaterialOrders, listOrderLines } from '../../api/materialOrderApi.j
 import { listMaterials } from '../../api/materialApi.js';
 import { listHoldsByOrderId, listOpenHolds } from '../../api/holdApi.js';
 import { listSuppliers } from '../../api/supplierApi.js';
+import { materialUnitLabel } from '../../utils/unitLabel.js';
 
 const STATUS_LABEL = {
   NOT_ARRIVED: { text: '未入荷', className: 'text-bg-secondary' },
@@ -48,6 +49,7 @@ export default function OrderDetailPage() {
   const order = orders.find((o) => o.orderId === numericOrderId);
   const orderMaterial = order ? materials.find((m) => m.materialId === order.materialId) : null;
   const isRaw = orderMaterial?.category === 'RAW';
+  const unit = materialUnitLabel(orderMaterial?.baseUnit); // 現場が数字の意味を一瞬で判断できるよう、常に単位を添える
 
   function materialName(materialId) {
     return materials.find((m) => m.materialId === materialId)?.name ?? `材料ID:${materialId}`;
@@ -66,7 +68,10 @@ export default function OrderDetailPage() {
     return line ? `${line.supplierLotNo}(明細ID${lineId})` : `明細ID${lineId}`;
   }
 
-  const totalAccepted = lines.reduce((sum, l) => sum + Number(l.acceptedQty), 0);
+  // 【修正履歴】以前はここで material_arrival_line.acceptedQty を独自に合計していたが、
+  // 「結局受け入れ」(ACCEPTED_LATE)経由の合格分が反映されず、発注一覧の表示と
+  // 数字が食い違う不具合があった。バックエンドが計算済みの totalAcceptedQty
+  // (通常の合格分 + 結局受け入れ分)を、そのまま使うように変更した。
   const statusInfo = order ? STATUS_LABEL[order.status] ?? { text: order.status, className: 'text-bg-secondary' } : null;
 
   return (
@@ -85,16 +90,19 @@ export default function OrderDetailPage() {
           <dd className="col-9 col-md-10">{supplierName(order.supplierId)}</dd>
 
           <dt className="col-3 col-md-2 text-muted fw-normal">発注数量</dt>
-          <dd className="col-9 col-md-10">{order.orderQty}</dd>
+          <dd className="col-9 col-md-10">{order.orderQty}{unit}</dd>
 
           <dt className="col-3 col-md-2 text-muted fw-normal">状況</dt>
           <dd className="col-9 col-md-10">
             <span className={`badge ${statusInfo.className}`}>{statusInfo.text}</span>
+            {order.hasHoldHistory && (
+              <span className="badge text-bg-warning ms-1">⚠ 保留対応あり</span>
+            )}
           </dd>
 
           <dt className="col-3 col-md-2 text-muted fw-normal">合格数量の合計</dt>
           <dd className="col-9 col-md-10">
-            {totalAccepted} / {order.orderQty}
+            {order.totalAcceptedQty}{unit} / {order.orderQty}{unit}
           </dd>
         </dl>
       )}
@@ -125,9 +133,9 @@ export default function OrderDetailPage() {
                   <td>{line.supplierLotNo}</td>
                   {isRaw && <td>{line.origin}</td>}
                   <td>{line.expiryDate}</td>
-                  <td>{line.acceptedQty}</td>
+                  <td>{line.acceptedQty}{unit}</td>
                   <td>
-                    {line.heldQty}
+                    {line.heldQty}{unit}
                     {hasHold && <span className="badge text-bg-warning ms-2">保留</span>}
                   </td>
                   <td>
@@ -181,7 +189,7 @@ export default function OrderDetailPage() {
               <tr key={hold.holdId}>
                 <td>{hold.holdId}</td>
                 <td>{lineLabel(hold.lineId)}</td>
-                <td>{hold.heldQtySnapshot}</td>
+                <td>{hold.heldQtySnapshot}{unit}</td>
                 <td>
                   {hold.status === 'RESOLVED' ? (
                     <span className="badge text-bg-success">対応済み</span>

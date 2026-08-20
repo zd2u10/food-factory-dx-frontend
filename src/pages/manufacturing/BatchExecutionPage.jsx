@@ -13,6 +13,7 @@ import { listMaterials } from '../../api/materialApi.js';
 import { DialPadField } from '../../components/DialPad.jsx';
 import ConfirmModal from '../../components/ConfirmModal.jsx';
 import TabletViewport from '../../components/TabletViewport.jsx';
+import { materialUnitLabel, itemUnitLabel } from '../../utils/unitLabel.js';
 
 /**
  * 1つのバッチについて、状態に応じた画面を出し分ける詳細ページ。
@@ -57,7 +58,7 @@ export default function BatchExecutionPage() {
         </Link>
         <h1 className="h4 mb-1">{itemName}</h1>
         <p className="text-muted mb-4">
-          製造日: {batch.batchDate} / 計画数量: {batch.plannedQty} / 状態: {batch.status}
+          製造日: {batch.batchDate} / 計画数量: {batch.plannedQty}{itemUnitLabel()} / 状態: {batch.status}
         </p>
 
         {batch.status === 'PLAN' && <ExecuteSection batch={batch} onDone={invalidateAndGoBack} />}
@@ -87,6 +88,10 @@ function ExecuteSection({ batch, onDone }) {
 
   function materialName(materialId) {
     return materials.find((m) => m.materialId === materialId)?.name ?? `材料ID:${materialId}`;
+  }
+
+  function materialUnit(materialId) {
+    return materialUnitLabel(materials.find((m) => m.materialId === materialId)?.baseUnit);
   }
 
   const executeMutation = useMutation({
@@ -148,7 +153,7 @@ function ExecuteSection({ batch, onDone }) {
               <li key={materialId}>
                 {materialName(Number(materialId))}:{' '}
                 {linesByMaterial[materialId]
-                  .map((line) => `ロット${line.supplierLotNo}(${line.allocatedQty}g)`)
+                  .map((line) => `ロット${line.supplierLotNo}(${line.allocatedQty}${materialUnit(Number(materialId))})`)
                   .join(' + ')}
               </li>
             ))}
@@ -169,7 +174,7 @@ function ExecuteSection({ batch, onDone }) {
                 </p>
                 <p className="text-muted small mb-2">
                   {isRawMaterial(line.materialId) && <>産地: {line.origin} / </>}
-                  参考(理論値): {line.allocatedQty}
+                  参考(理論値): {line.allocatedQty}{materialUnit(line.materialId)}
                 </p>
                 <DialPadField
                   label="実測使用量"
@@ -178,7 +183,7 @@ function ExecuteSection({ batch, onDone }) {
                   onChange={(v) =>
                     setActualUsages((prev) => ({ ...prev, [line.materialLotId]: v }))
                   }
-                  unit="g"
+                  unit={materialUnit(line.materialId)}
                 />
               </div>
             </div>
@@ -271,7 +276,7 @@ function CompleteSection({ batch, onDone }) {
         >
           検品完了として確定する
         </button>
-        <button type="button" className="btn btn-outline-danger" onClick={() => setPendingReject(true)}>
+        <button type="button" className="btn btn-danger" onClick={() => setPendingReject(true)}>
           重大な異常のため破棄する
         </button>
       </div>

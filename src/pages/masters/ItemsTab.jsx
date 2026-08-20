@@ -163,7 +163,7 @@ export default function ItemsTab() {
                         )}
                       </td>
                       <td>
-                        <div className="btn-group btn-group-sm">
+                        <div className="btn-group btn-group-sm gap-2">
                           <Link to={`/masters/items/${item.itemId}/recipe`} className="btn btn-secondary">
                             レシピ
                           </Link>
