@@ -116,7 +116,7 @@ export default function CustomersTab() {
                           : '指定なし'}
                       </td>
                       <td>
-                        <button className="btn btn-outline-primary btn-sm" onClick={() => setEditingCustomer(customer)}>
+                        <button className="btn btn-primary btn-sm" onClick={() => setEditingCustomer(customer)}>
                           編集
                         </button>
                       </td>

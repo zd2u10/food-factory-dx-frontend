@@ -83,9 +83,15 @@ export default function DialPad({ value, onChange, unit }) {
  * 通常は数値だけを表示しておき、タップするとダイヤルパッドが展開する。
  * (画面上に常時ダイヤルパッドを表示すると場所を取りすぎるため、
  *  必要な項目だけ展開する省スペースな作りにしている)
+ *
+ * placeholderValue: システムが計算した理論値。実測値が未入力の間、
+ *   通常のinput要素のplaceholder属性と同じ考え方で、薄い色でこの値を表示する。
+ *   人が実際に入力した値(value)がある場合は、そちらを優先して表示する。
+ *   要件定義書5.1節「作業員が実測値を入力(システムの計算値はプレースホルダーとして表示)」に対応。
  */
-export function DialPadField({ label, value, onChange, unit }) {
+export function DialPadField({ label, value, onChange, unit, placeholderValue }) {
   const [open, setOpen] = useState(false);
+  const hasValue = value !== '' && value !== undefined && value !== null;
 
   return (
     <div className="mb-3">
@@ -96,7 +102,19 @@ export function DialPadField({ label, value, onChange, unit }) {
         style={{ fontSize: '1.25rem' }}
         onClick={() => setOpen((prev) => !prev)}
       >
-        {value || '0'} {unit}
+        {hasValue ? (
+          <span>
+            {value} {unit}
+          </span>
+        ) : placeholderValue !== undefined ? (
+          <span className="text-muted">
+            {placeholderValue} {unit}
+          </span>
+        ) : (
+          <span className="text-muted">
+            0 {unit}
+          </span>
+        )}
       </button>
       {open && (
         <div className="mt-2">

@@ -91,7 +91,7 @@ export default function CarriersTab() {
                       <td>{carrier.carrierId}</td>
                       <td>{carrier.name}</td>
                       <td>
-                        <button className="btn btn-outline-primary btn-sm" onClick={() => setEditingCarrier(carrier)}>
+                        <button className="btn btn-primary btn-sm" onClick={() => setEditingCarrier(carrier)}>
                           編集
                         </button>
                       </td>

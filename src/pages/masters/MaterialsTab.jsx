@@ -274,23 +274,23 @@ function MaterialTable({ materials, onEdit, onDeactivate, onReactivate }) {
                   */}
                   <Link
                     to={`/masters/materials/${material.materialId}/origins`}
-                    className="btn btn-outline-secondary"
+                    className="btn btn-secondary"
                   >
                     {material.category === 'RAW' ? '産地管理' : '梱包仕様管理'}
                   </Link>
-                  <button className="btn btn-outline-primary" onClick={() => onEdit(material)}>
+                  <button className="btn btn-primary" onClick={() => onEdit(material)}>
                     編集
                   </button>
                   {material.active ? (
                     <button
-                      className="btn btn-outline-danger"
+                      className="btn btn-danger"
                       onClick={() => onDeactivate(material.materialId)}
                     >
                       廃版にする
                     </button>
                   ) : (
                     <button
-                      className="btn btn-outline-success"
+                      className="btn btn-success"
                       onClick={() => onReactivate(material.materialId)}
                     >
                       復元する

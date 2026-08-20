@@ -164,22 +164,22 @@ export default function ItemsTab() {
                       </td>
                       <td>
                         <div className="btn-group btn-group-sm">
-                          <Link to={`/masters/items/${item.itemId}/recipe`} className="btn btn-outline-secondary">
+                          <Link to={`/masters/items/${item.itemId}/recipe`} className="btn btn-secondary">
                             レシピ
                           </Link>
-                          <button className="btn btn-outline-primary" onClick={() => setEditingItem(item)}>
+                          <button className="btn btn-primary" onClick={() => setEditingItem(item)}>
                             編集
                           </button>
                           {item.active ? (
                             <button
-                              className="btn btn-outline-danger"
+                              className="btn btn-danger"
                               onClick={() => setPendingDeactivateId(item.itemId)}
                             >
                               廃版にする
                             </button>
                           ) : (
                             <button
-                              className="btn btn-outline-success"
+                              className="btn btn-success"
                               onClick={() => reactivateMutation.mutate(item.itemId)}
                             >
                               復元する

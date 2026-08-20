@@ -12,6 +12,7 @@ import { listItems } from '../../api/itemApi.js';
 import { listMaterials } from '../../api/materialApi.js';
 import { DialPadField } from '../../components/DialPad.jsx';
 import ConfirmModal from '../../components/ConfirmModal.jsx';
+import TabletViewport from '../../components/TabletViewport.jsx';
 
 /**
  * 1つのバッチについて、状態に応じた画面を出し分ける詳細ページ。
@@ -39,29 +40,33 @@ export default function BatchExecutionPage() {
 
   if (!batch) {
     return (
-      <div className="container-fluid py-4">
-        <p className="text-muted">バッチが見つかりません。</p>
-        <Link to="/manufacturing">製造ページへ戻る</Link>
-      </div>
+      <TabletViewport>
+        <div className="container-fluid py-4">
+          <p className="text-muted">バッチが見つかりません。</p>
+          <Link to="/manufacturing">製造ページへ戻る</Link>
+        </div>
+      </TabletViewport>
     );
   }
 
   return (
-    <div className="container-fluid py-4">
-      <Link to="/manufacturing" className="d-inline-block mb-3">
-        ← 製造ページへ戻る
-      </Link>
-      <h1 className="h4 mb-1">{itemName}</h1>
-      <p className="text-muted mb-4">
-        製造日: {batch.batchDate} / 計画数量: {batch.plannedQty} / 状態: {batch.status}
-      </p>
+    <TabletViewport>
+      <div className="container-fluid py-4">
+        <Link to="/manufacturing" className="d-inline-block mb-3">
+          ← 製造ページへ戻る
+        </Link>
+        <h1 className="h4 mb-1">{itemName}</h1>
+        <p className="text-muted mb-4">
+          製造日: {batch.batchDate} / 計画数量: {batch.plannedQty} / 状態: {batch.status}
+        </p>
 
-      {batch.status === 'PLAN' && <ExecuteSection batch={batch} onDone={invalidateAndGoBack} />}
-      {batch.status === 'MANUFACTURING' && <CompleteSection batch={batch} onDone={invalidateAndGoBack} />}
-      {!['PLAN', 'MANUFACTURING'].includes(batch.status) && (
-        <p className="text-muted">この状態(status: {batch.status})では操作できません。</p>
-      )}
-    </div>
+        {batch.status === 'PLAN' && <ExecuteSection batch={batch} onDone={invalidateAndGoBack} />}
+        {batch.status === 'MANUFACTURING' && <CompleteSection batch={batch} onDone={invalidateAndGoBack} />}
+        {!['PLAN', 'MANUFACTURING'].includes(batch.status) && (
+          <p className="text-muted">この状態(status: {batch.status})では操作できません。</p>
+        )}
+      </div>
+    </TabletViewport>
   );
 }
 
@@ -78,6 +83,10 @@ function ExecuteSection({ batch, onDone }) {
 
   function isRawMaterial(materialId) {
     return materials.find((m) => m.materialId === materialId)?.category === 'RAW';
+  }
+
+  function materialName(materialId) {
+    return materials.find((m) => m.materialId === materialId)?.name ?? `材料ID:${materialId}`;
   }
 
   const executeMutation = useMutation({
@@ -99,6 +108,19 @@ function ExecuteSection({ batch, onDone }) {
     );
   }
 
+  // 複数ロット混合の検出: 同じmaterialIdの行が2件以上あれば、
+  // 「1つの材料を賄うのに、複数のロットにまたがって引き当てている」ことを意味する
+  // (要件定義書5.1節: 1ロットで不足する場合は次に期限が近いロットに進むため発生する)。
+  const linesByMaterial = {};
+  preview.lines.forEach((line) => {
+    if (!linesByMaterial[line.materialId]) linesByMaterial[line.materialId] = [];
+    linesByMaterial[line.materialId].push(line);
+  });
+  const mixedMaterialIds = Object.keys(linesByMaterial).filter(
+    (materialId) => linesByMaterial[materialId].length > 1
+  );
+  const hasMixing = mixedMaterialIds.length > 0;
+
   const allEntered = preview.lines.every((line) => actualUsages[line.materialLotId]);
 
   function buildPayload() {
@@ -111,12 +133,40 @@ function ExecuteSection({ batch, onDone }) {
   return (
     <div>
       <h2 className="h5 mb-3">材料の実測値を入力してください</h2>
+
+      {/*
+        複数ロット混合が発生する材料がある場合、確認モーダルを開くまでもなく
+        画面上に常に見える警告として表示しておく(要件の「明示的な操作でのみ先に進める」を
+        より確実にするため、実行ボタンを押す前の時点から視認できるようにしている)。
+      */}
+      {hasMixing && (
+        <div className="alert alert-warning">
+          <strong>複数ロットの混合が発生します。</strong>
+          以下の材料は、1つのロットだけでは必要量を賄えないため、複数のロットから合算して使用します。
+          <ul className="mb-0 mt-2">
+            {mixedMaterialIds.map((materialId) => (
+              <li key={materialId}>
+                {materialName(Number(materialId))}:{' '}
+                {linesByMaterial[materialId]
+                  .map((line) => `ロット${line.supplierLotNo}(${line.allocatedQty}g)`)
+                  .join(' + ')}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="row g-3">
         {preview.lines.map((line) => (
           <div className="col-12 col-md-6 col-lg-4" key={line.materialLotId}>
             <div className="card">
               <div className="card-body">
-                <p className="mb-1 fw-bold">ロット: {line.supplierLotNo}</p>
+                <p className="mb-1 fw-bold">
+                  ロット: {line.supplierLotNo}
+                  {linesByMaterial[line.materialId]?.length > 1 && (
+                    <span className="badge text-bg-warning ms-2">混合</span>
+                  )}
+                </p>
                 <p className="text-muted small mb-2">
                   {isRawMaterial(line.materialId) && <>産地: {line.origin} / </>}
                   参考(理論値): {line.allocatedQty}
@@ -124,6 +174,7 @@ function ExecuteSection({ batch, onDone }) {
                 <DialPadField
                   label="実測使用量"
                   value={actualUsages[line.materialLotId] ?? ''}
+                  placeholderValue={line.allocatedQty}
                   onChange={(v) =>
                     setActualUsages((prev) => ({ ...prev, [line.materialLotId]: v }))
                   }
@@ -146,12 +197,22 @@ function ExecuteSection({ batch, onDone }) {
 
       <ConfirmModal
         show={pendingExecute}
-        title="製造を実行します"
-        confirmLabel="実行する"
-        summaryLines={preview.lines.map((line) => ({
-          label: `ロット ${line.supplierLotNo}`,
-          value: `${actualUsages[line.materialLotId]} g`,
-        }))}
+        title={hasMixing ? '複数ロット混合を確認の上、製造を実行します' : '製造を実行します'}
+        confirmLabel={hasMixing ? '混合内容を確認して実行する' : '実行する'}
+        summaryLines={[
+          ...(hasMixing
+            ? mixedMaterialIds.map((materialId) => ({
+                label: `⚠ ${materialName(Number(materialId))}(複数ロット混合)`,
+                value: linesByMaterial[materialId]
+                  .map((line) => `${line.supplierLotNo}: ${actualUsages[line.materialLotId]}g`)
+                  .join(' / '),
+              }))
+            : []),
+          ...preview.lines.map((line) => ({
+            label: `ロット ${line.supplierLotNo}`,
+            value: `${actualUsages[line.materialLotId]} g`,
+          })),
+        ]}
         onConfirm={() => {
           executeMutation.mutate(buildPayload());
           setPendingExecute(false);

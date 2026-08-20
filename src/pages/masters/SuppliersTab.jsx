@@ -151,19 +151,19 @@ export default function SuppliersTab() {
                       </td>
                       <td>
                         <div className="btn-group btn-group-sm">
-                          <button className="btn btn-outline-primary" onClick={() => setEditingSupplier(supplier)}>
+                          <button className="btn btn-primary" onClick={() => setEditingSupplier(supplier)}>
                             編集
                           </button>
                           {supplier.active ? (
                             <button
-                              className="btn btn-outline-danger"
+                              className="btn btn-danger"
                               onClick={() => setPendingDeactivateId(supplier.supplierId)}
                             >
                               廃版にする
                             </button>
                           ) : (
                             <button
-                              className="btn btn-outline-success"
+                              className="btn btn-success"
                               onClick={() => reactivateMutation.mutate(supplier.supplierId)}
                             >
                               復元する
