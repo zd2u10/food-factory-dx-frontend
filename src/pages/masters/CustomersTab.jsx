@@ -17,6 +17,7 @@ const emptyForm = { name: '', customerType: 'B2B', requiredResidualDays: '' };
 export default function CustomersTab() {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [pendingSubmit, setPendingSubmit] = useState(null);
+  const [showForm, setShowForm] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -30,6 +31,7 @@ export default function CustomersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setEditingCustomer(null);
+      setShowForm(false);
     },
   });
 
@@ -38,6 +40,7 @@ export default function CustomersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setEditingCustomer(null);
+      setShowForm(false);
     },
   });
 
@@ -62,6 +65,18 @@ export default function CustomersTab() {
     setPendingSubmit(null);
   }
 
+  function handleEdit(customer) {
+    setEditingCustomer(customer);
+    setShowForm(true);
+  }
+
+  function handleToggleForm() {
+    if (showForm) {
+      setEditingCustomer(null);
+    }
+    setShowForm((prev) => !prev);
+  }
+
   return (
     <div>
       {displayError && (
@@ -70,19 +85,28 @@ export default function CustomersTab() {
         </div>
       )}
 
-      <div className="row g-4">
-        <div className="col-12 col-lg-4">
-          <CustomerForm
-            key={editingCustomer ? editingCustomer.customerId : 'new'}
-            initialValue={editingCustomer ?? emptyForm}
-            isEditing={!!editingCustomer}
-            isSaving={isSaving}
-            onSubmit={handleRequestSubmit}
-            onCancelEdit={() => setEditingCustomer(null)}
-          />
-        </div>
+      <button type="button" className="btn btn-success mb-3" onClick={handleToggleForm}>
+        {showForm ? 'フォームを閉じる' : '+ 新規取引先登録'}
+      </button>
 
-        <div className="col-12 col-lg-8">
+      <div className="row g-4">
+        {showForm && (
+          <div className="col-12 col-lg-4">
+            <CustomerForm
+              key={editingCustomer ? editingCustomer.customerId : 'new'}
+              initialValue={editingCustomer ?? emptyForm}
+              isEditing={!!editingCustomer}
+              isSaving={isSaving}
+              onSubmit={handleRequestSubmit}
+              onCancelEdit={() => {
+                setEditingCustomer(null);
+                setShowForm(false);
+              }}
+            />
+          </div>
+        )}
+
+        <div className={showForm ? 'col-12 col-lg-8' : 'col-12'}>
           <h2 className="h5 mb-3">登録済み取引先一覧</h2>
           {isLoading ? (
             <p className="text-muted">読み込み中...</p>
@@ -116,7 +140,7 @@ export default function CustomersTab() {
                           : '指定なし'}
                       </td>
                       <td>
-                        <button className="btn btn-primary btn-sm" onClick={() => setEditingCustomer(customer)}>
+                        <button className="btn btn-primary btn-sm" onClick={() => handleEdit(customer)}>
                           編集
                         </button>
                       </td>
@@ -171,7 +195,7 @@ function CustomerForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdi
   return (
     <div className="card">
       <div className="card-body">
-        <h2 className="h5 card-title">{isEditing ? '取引先を編集' : '新規登録'}</h2>
+        <h2 className="h5 card-title">{isEditing ? '取引先を編集' : '新規取引先登録'}</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label htmlFor="name" className="form-label">

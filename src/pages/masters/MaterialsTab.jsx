@@ -38,6 +38,9 @@ export default function MaterialsTab() {
   //   これも2つの操作を同時に確認待ちにしないよう、別々のstateに分けている。
   const [pendingSubmit, setPendingSubmit] = useState(null);
   const [pendingDeactivateId, setPendingDeactivateId] = useState(null);
+  // フォームの開閉状態。「+ 新規登録」ボタンを押すか、一覧の「編集」ボタンを押した時だけ開く。
+  // 登録するつもりがない時に、常時フォームが画面領域を占有しないようにするため。
+  const [showForm, setShowForm] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -55,6 +58,7 @@ export default function MaterialsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
       setEditingMaterial(null);
+      setShowForm(false);
     },
   });
 
@@ -63,6 +67,7 @@ export default function MaterialsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
       setEditingMaterial(null);
+      setShowForm(false);
     },
   });
 
@@ -115,6 +120,18 @@ export default function MaterialsTab() {
   // 廃版確認モーダルに表示する対象材料(名前を出したいため一覧から探す)
   const deactivateTarget = materials.find((m) => m.materialId === pendingDeactivateId);
 
+  function handleEdit(material) {
+    setEditingMaterial(material);
+    setShowForm(true); // 編集ボタンを押した時は、自動的にフォームを開く
+  }
+
+  function handleToggleForm() {
+    if (showForm) {
+      setEditingMaterial(null); // フォームを閉じる際、編集中のデータも解除しておく
+    }
+    setShowForm((prev) => !prev);
+  }
+
   return (
     <div>
       {displayError && (
@@ -123,19 +140,28 @@ export default function MaterialsTab() {
         </div>
       )}
 
-      <div className="row g-4">
-        <div className="col-12 col-lg-4">
-          <MaterialForm
-            key={editingMaterial ? editingMaterial.materialId : 'new'}
-            initialValue={editingMaterial ?? emptyForm}
-            isEditing={!!editingMaterial}
-            isSaving={isSaving}
-            onSubmit={handleRequestSubmit}
-            onCancelEdit={() => setEditingMaterial(null)}
-          />
-        </div>
+      <button type="button" className="btn btn-success mb-3" onClick={handleToggleForm}>
+        {showForm ? 'フォームを閉じる' : '+ 新規材料登録'}
+      </button>
 
-        <div className="col-12 col-lg-8">
+      <div className="row g-4">
+        {showForm && (
+          <div className="col-12 col-lg-4">
+            <MaterialForm
+              key={editingMaterial ? editingMaterial.materialId : 'new'}
+              initialValue={editingMaterial ?? emptyForm}
+              isEditing={!!editingMaterial}
+              isSaving={isSaving}
+              onSubmit={handleRequestSubmit}
+              onCancelEdit={() => {
+                setEditingMaterial(null);
+                setShowForm(false);
+              }}
+            />
+          </div>
+        )}
+
+        <div className={showForm ? 'col-12 col-lg-8' : 'col-12'}>
           <FilterBar
             categoryFilter={categoryFilter}
             activeFilter={activeFilter}
@@ -149,7 +175,7 @@ export default function MaterialsTab() {
           ) : (
             <MaterialTable
               materials={materials}
-              onEdit={setEditingMaterial}
+              onEdit={handleEdit}
               onDeactivate={handleRequestDeactivate}
               onReactivate={(id) => reactivateMutation.mutate(id)}
             />
@@ -325,7 +351,7 @@ function MaterialForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdi
   return (
     <div className="card">
       <div className="card-body">
-        <h2 className="h5 card-title">{isEditing ? '材料を編集' : '新規登録'}</h2>
+        <h2 className="h5 card-title">{isEditing ? '材料を編集' : '新規材料登録'}</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label htmlFor="name" className="form-label">

@@ -357,6 +357,12 @@ function OrderForm({ materials, suppliers, onSubmit, isSaving }) {
 
   function handleSubmit(event) {
     event.preventDefault();
+    // パッケージ数量は必ず整数(箱・袋を「半端な数」で発注することはできないため)。
+    // step="1"だけではキーボード直接入力による小数混入を防げないため、送信直前にも確認する。
+    if (!Number.isInteger(Number(form.packageQty))) {
+      window.alert('パッケージ数量は整数で入力してください(小数は指定できません)。');
+      return;
+    }
     onSubmit({
       materialId: form.materialId,
       supplierId: form.supplierId,
@@ -458,12 +464,16 @@ function OrderForm({ materials, suppliers, onSubmit, isSaving }) {
               name="packageQty"
               type="number"
               min="0"
+              step="1"
               className="form-control"
               value={form.packageQty}
               onChange={handleChange}
               disabled={!selectedGroup}
               required
             />
+            <div className="form-text">
+              パッケージ数量は、箱・袋のように必ず整数で数えるため、小数は入力できません。
+            </div>
             {selectedGroup && (
               <div className="form-text">
                 合計量(自動計算): {orderQty ?? 0}{materialUnitLabel(selectedMaterial?.baseUnit)}

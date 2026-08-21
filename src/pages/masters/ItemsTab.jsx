@@ -22,6 +22,8 @@ export default function ItemsTab() {
   const [pendingSubmit, setPendingSubmit] = useState(null);
   const [pendingDeactivateId, setPendingDeactivateId] = useState(null);
   const [activeFilter, setActiveFilter] = useState(''); // '' = 絞り込まない, 'true', 'false'
+  // フォームの開閉状態。「+ 新規登録」ボタンを押すか、一覧の「編集」ボタンを押した時だけ開く。
+  const [showForm, setShowForm] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -35,6 +37,7 @@ export default function ItemsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items'] });
       setEditingItem(null);
+      setShowForm(false);
     },
   });
 
@@ -43,6 +46,7 @@ export default function ItemsTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items'] });
       setEditingItem(null);
+      setShowForm(false);
     },
   });
 
@@ -92,6 +96,18 @@ export default function ItemsTab() {
     setPendingSubmit(null);
   }
 
+  function handleEdit(item) {
+    setEditingItem(item);
+    setShowForm(true);
+  }
+
+  function handleToggleForm() {
+    if (showForm) {
+      setEditingItem(null);
+    }
+    setShowForm((prev) => !prev);
+  }
+
   return (
     <div>
       {displayError && (
@@ -100,19 +116,28 @@ export default function ItemsTab() {
         </div>
       )}
 
-      <div className="row g-4">
-        <div className="col-12 col-lg-4">
-          <ItemForm
-            key={editingItem ? editingItem.itemId : 'new'}
-            initialValue={editingItem ?? emptyForm}
-            isEditing={!!editingItem}
-            isSaving={isSaving}
-            onSubmit={handleRequestSubmit}
-            onCancelEdit={() => setEditingItem(null)}
-          />
-        </div>
+      <button type="button" className="btn btn-success mb-3" onClick={handleToggleForm}>
+        {showForm ? 'フォームを閉じる' : '+ 新規商品登録'}
+      </button>
 
-        <div className="col-12 col-lg-8">
+      <div className="row g-4">
+        {showForm && (
+          <div className="col-12 col-lg-4">
+            <ItemForm
+              key={editingItem ? editingItem.itemId : 'new'}
+              initialValue={editingItem ?? emptyForm}
+              isEditing={!!editingItem}
+              isSaving={isSaving}
+              onSubmit={handleRequestSubmit}
+              onCancelEdit={() => {
+                setEditingItem(null);
+                setShowForm(false);
+              }}
+            />
+          </div>
+        )}
+
+        <div className={showForm ? 'col-12 col-lg-8' : 'col-12'}>
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h2 className="h5 mb-0">登録済み商品一覧</h2>
             <select
@@ -167,7 +192,7 @@ export default function ItemsTab() {
                           <Link to={`/masters/items/${item.itemId}/recipe`} className="btn btn-secondary">
                             レシピ
                           </Link>
-                          <button className="btn btn-primary" onClick={() => setEditingItem(item)}>
+                          <button className="btn btn-primary" onClick={() => handleEdit(item)}>
                             編集
                           </button>
                           {item.active ? (
@@ -245,7 +270,7 @@ function ItemForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit })
   return (
     <div className="card">
       <div className="card-body">
-        <h2 className="h5 card-title">{isEditing ? '商品を編集' : '新規登録'}</h2>
+        <h2 className="h5 card-title">{isEditing ? '商品を編集' : '新規商品登録'}</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label htmlFor="name" className="form-label">

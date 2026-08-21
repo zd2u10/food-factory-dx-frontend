@@ -9,6 +9,7 @@ const emptyForm = { name: '' };
 export default function CarriersTab() {
   const [editingCarrier, setEditingCarrier] = useState(null);
   const [pendingSubmit, setPendingSubmit] = useState(null);
+  const [showForm, setShowForm] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -22,6 +23,7 @@ export default function CarriersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['carriers'] });
       setEditingCarrier(null);
+      setShowForm(false);
     },
   });
 
@@ -30,6 +32,7 @@ export default function CarriersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['carriers'] });
       setEditingCarrier(null);
+      setShowForm(false);
     },
   });
 
@@ -45,6 +48,18 @@ export default function CarriersTab() {
     setPendingSubmit(null);
   }
 
+  function handleEdit(carrier) {
+    setEditingCarrier(carrier);
+    setShowForm(true);
+  }
+
+  function handleToggleForm() {
+    if (showForm) {
+      setEditingCarrier(null);
+    }
+    setShowForm((prev) => !prev);
+  }
+
   return (
     <div>
       {displayError && (
@@ -53,19 +68,28 @@ export default function CarriersTab() {
         </div>
       )}
 
-      <div className="row g-4">
-        <div className="col-12 col-lg-4">
-          <CarrierForm
-            key={editingCarrier ? editingCarrier.carrierId : 'new'}
-            initialValue={editingCarrier ?? emptyForm}
-            isEditing={!!editingCarrier}
-            isSaving={isSaving}
-            onSubmit={setPendingSubmit}
-            onCancelEdit={() => setEditingCarrier(null)}
-          />
-        </div>
+      <button type="button" className="btn btn-success mb-3" onClick={handleToggleForm}>
+        {showForm ? 'フォームを閉じる' : '+ 新規配送会社登録'}
+      </button>
 
-        <div className="col-12 col-lg-8">
+      <div className="row g-4">
+        {showForm && (
+          <div className="col-12 col-lg-4">
+            <CarrierForm
+              key={editingCarrier ? editingCarrier.carrierId : 'new'}
+              initialValue={editingCarrier ?? emptyForm}
+              isEditing={!!editingCarrier}
+              isSaving={isSaving}
+              onSubmit={setPendingSubmit}
+              onCancelEdit={() => {
+                setEditingCarrier(null);
+                setShowForm(false);
+              }}
+            />
+          </div>
+        )}
+
+        <div className={showForm ? 'col-12 col-lg-8' : 'col-12'}>
           <h2 className="h5 mb-3">登録済み配送会社一覧</h2>
           {isLoading ? (
             <p className="text-muted">読み込み中...</p>
@@ -91,7 +115,7 @@ export default function CarriersTab() {
                       <td>{carrier.carrierId}</td>
                       <td>{carrier.name}</td>
                       <td>
-                        <button className="btn btn-primary btn-sm" onClick={() => setEditingCarrier(carrier)}>
+                        <button className="btn btn-primary btn-sm" onClick={() => handleEdit(carrier)}>
                           編集
                         </button>
                       </td>
@@ -131,7 +155,7 @@ function CarrierForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdit
   return (
     <div className="card">
       <div className="card-body">
-        <h2 className="h5 card-title">{isEditing ? '配送会社を編集' : '新規登録'}</h2>
+        <h2 className="h5 card-title">{isEditing ? '配送会社を編集' : '新規配送会社登録'}</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label htmlFor="name" className="form-label">

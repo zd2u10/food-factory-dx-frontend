@@ -8,6 +8,8 @@ import NewArrivalPage from './pages/procurement/NewArrivalPage.jsx';
 import OrderDetailPage from './pages/procurement/OrderDetailPage.jsx';
 import InventoryPage from './pages/inventory/InventoryPage.jsx';
 import ManufacturingPage from './pages/manufacturing/ManufacturingPage.jsx';
+import CalendarPage from './pages/manufacturing/CalendarPage.jsx';
+import DailyManufacturingPage from './pages/manufacturing/DailyManufacturingPage.jsx';
 import BatchExecutionPage from './pages/manufacturing/BatchExecutionPage.jsx';
 import OrdersPage from './pages/orders/OrdersPage.jsx';
 
@@ -28,7 +30,12 @@ export default function App() {
           {/* 発注一覧・発注詳細から直接遷移する、発注専用の入荷登録画面 */}
           <Route path="/procurement/orders/:orderId/arrivals/new" element={<NewArrivalPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/manufacturing" element={<ManufacturingPage />} />
+          {/* /manufacturing を開くと、まずカレンダーが表示される(新しい入り口)。
+              既存のDraft一覧/予定(日別)/MRPタブは、/manufacturing/tabs に移動し、
+              引き続き一括操作(MRP実行・一括PLAN確定など)の場として残す。 */}
+          <Route path="/manufacturing" element={<CalendarPage />} />
+          <Route path="/manufacturing/daily/:date" element={<DailyManufacturingPage />} />
+          <Route path="/manufacturing/tabs" element={<ManufacturingPage />} />
           <Route path="/manufacturing/batches/:batchId" element={<BatchExecutionPage />} />
           <Route path="/orders" element={<OrdersPage />} />
         </Route>

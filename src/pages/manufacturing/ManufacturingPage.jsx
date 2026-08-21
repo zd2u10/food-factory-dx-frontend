@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import DraftListTab from './DraftListTab.jsx';
 import PlanByDateTab from './PlanByDateTab.jsx';
 import MrpTab from './MrpTab.jsx';
@@ -17,7 +18,10 @@ export default function ManufacturingPage() {
   return (
     <TabletViewport>
       <div className="container-fluid py-4">
-        <h1 className="h3 mb-4">製造</h1>
+        <Link to="/manufacturing" className="d-inline-block mb-3">
+          ← カレンダーへ戻る
+        </Link>
+        <h1 className="h3 mb-4">製造(一括操作)</h1>
 
         <ul className="nav nav-tabs mb-4">
           {TABS.map((tab) => (

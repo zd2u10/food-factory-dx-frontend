@@ -201,6 +201,11 @@ export default function NewArrivalPage() {
       for (const lot of block.lots) {
         const acceptedPkg = Number(lot.acceptedPackageCount || 0);
         const heldPkg = Number(lot.heldPackageCount || 0);
+        // 合格・保留の数量は必ず整数(箱・袋を「半端な数」で計上することはできないため)。
+        if (!Number.isInteger(acceptedPkg) || !Number.isInteger(heldPkg)) {
+          window.alert('合格・保留の数量は整数で入力してください(小数は指定できません)。');
+          return;
+        }
         lines.push({
           resolvesHoldId: block.registrationMode === 'exchange' ? Number(block.resolvesHoldId) : null,
           summary: {
@@ -606,6 +611,7 @@ function OriginBlockForm({ block, specs, holds, isRaw, unit, onChange, onRemove,
                 <input
                   type="number"
                   min="0"
+                  step="1"
                   className="form-control"
                   value={lot.acceptedPackageCount}
                   onChange={(e) => onUpdateLot(lot.key, { acceptedPackageCount: e.target.value })}
@@ -617,6 +623,7 @@ function OriginBlockForm({ block, specs, holds, isRaw, unit, onChange, onRemove,
                 <input
                   type="number"
                   min="0"
+                  step="1"
                   className="form-control"
                   value={lot.heldPackageCount}
                   onChange={(e) => onUpdateLot(lot.key, { heldPackageCount: e.target.value })}

@@ -20,6 +20,7 @@ export default function SuppliersTab() {
   const [pendingSubmit, setPendingSubmit] = useState(null);
   const [pendingDeactivateId, setPendingDeactivateId] = useState(null);
   const [activeFilter, setActiveFilter] = useState('');
+  const [showForm, setShowForm] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -33,6 +34,7 @@ export default function SuppliersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       setEditingSupplier(null);
+      setShowForm(false);
     },
   });
 
@@ -41,6 +43,7 @@ export default function SuppliersTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
       setEditingSupplier(null);
+      setShowForm(false);
     },
   });
 
@@ -81,6 +84,18 @@ export default function SuppliersTab() {
 
   const deactivateTarget = suppliers.find((s) => s.supplierId === pendingDeactivateId);
 
+  function handleEdit(supplier) {
+    setEditingSupplier(supplier);
+    setShowForm(true);
+  }
+
+  function handleToggleForm() {
+    if (showForm) {
+      setEditingSupplier(null);
+    }
+    setShowForm((prev) => !prev);
+  }
+
   return (
     <div>
       {displayError && (
@@ -89,19 +104,28 @@ export default function SuppliersTab() {
         </div>
       )}
 
-      <div className="row g-4">
-        <div className="col-12 col-lg-4">
-          <SupplierForm
-            key={editingSupplier ? editingSupplier.supplierId : 'new'}
-            initialValue={editingSupplier ?? emptyForm}
-            isEditing={!!editingSupplier}
-            isSaving={isSaving}
-            onSubmit={handleRequestSubmit}
-            onCancelEdit={() => setEditingSupplier(null)}
-          />
-        </div>
+      <button type="button" className="btn btn-success mb-3" onClick={handleToggleForm}>
+        {showForm ? 'フォームを閉じる' : '+ 新規仕入先登録'}
+      </button>
 
-        <div className="col-12 col-lg-8">
+      <div className="row g-4">
+        {showForm && (
+          <div className="col-12 col-lg-4">
+            <SupplierForm
+              key={editingSupplier ? editingSupplier.supplierId : 'new'}
+              initialValue={editingSupplier ?? emptyForm}
+              isEditing={!!editingSupplier}
+              isSaving={isSaving}
+              onSubmit={handleRequestSubmit}
+              onCancelEdit={() => {
+                setEditingSupplier(null);
+                setShowForm(false);
+              }}
+            />
+          </div>
+        )}
+
+        <div className={showForm ? 'col-12 col-lg-8' : 'col-12'}>
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h2 className="h5 mb-0">登録済み仕入先一覧</h2>
             <select
@@ -151,7 +175,7 @@ export default function SuppliersTab() {
                       </td>
                       <td>
                         <div className="btn-group btn-group-sm gap-2">
-                          <button className="btn btn-primary" onClick={() => setEditingSupplier(supplier)}>
+                          <button className="btn btn-primary" onClick={() => handleEdit(supplier)}>
                             編集
                           </button>
                           {supplier.active ? (
@@ -228,7 +252,7 @@ function SupplierForm({ initialValue, isEditing, isSaving, onSubmit, onCancelEdi
   return (
     <div className="card">
       <div className="card-body">
-        <h2 className="h5 card-title">{isEditing ? '仕入先を編集' : '新規登録'}</h2>
+        <h2 className="h5 card-title">{isEditing ? '仕入先を編集' : '新規仕入先登録'}</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label htmlFor="name" className="form-label">
