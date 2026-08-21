@@ -10,6 +10,7 @@ import InventoryPage from './pages/inventory/InventoryPage.jsx';
 import ManufacturingPage from './pages/manufacturing/ManufacturingPage.jsx';
 import CalendarPage from './pages/manufacturing/CalendarPage.jsx';
 import DailyManufacturingPage from './pages/manufacturing/DailyManufacturingPage.jsx';
+import DraftListViewPage from './pages/manufacturing/DraftListViewPage.jsx';
 import BatchExecutionPage from './pages/manufacturing/BatchExecutionPage.jsx';
 import OrdersPage from './pages/orders/OrdersPage.jsx';
 
@@ -35,6 +36,7 @@ export default function App() {
               引き続き一括操作(MRP実行・一括PLAN確定など)の場として残す。 */}
           <Route path="/manufacturing" element={<CalendarPage />} />
           <Route path="/manufacturing/daily/:date" element={<DailyManufacturingPage />} />
+          <Route path="/manufacturing/drafts" element={<DraftListViewPage />} />
           <Route path="/manufacturing/tabs" element={<ManufacturingPage />} />
           <Route path="/manufacturing/batches/:batchId" element={<BatchExecutionPage />} />
           <Route path="/orders" element={<OrdersPage />} />
